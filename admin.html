@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Админ панель</title>
+</head>
+
+<body>
+
+<h2>Результаты учеников</h2>
+
+<button onclick="loadResults()">Обновить</button>
+
+<div id="results"></div>
+
+<script>
+async function loadResults() {
+
+    let res = await fetch("https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest", {
+        headers: {
+            "X-Master-Key": "YOUR_API_KEY"
+        }
+    });
+
+    let data = await res.json();
+
+    let result = data.record;
+
+    document.getElementById("results").innerHTML = `
+        <p>Имя: ${result.name}</p>
+        <p>Ответы: ${result.answers.join(", ")}</p>
+        <p>Правильно: ${result.correct} / ${result.total}</p>
+        <p>Дата: ${result.date}</p>
+        <hr>
+    `;
+}
+</script>
+
+</body>
+</html>
