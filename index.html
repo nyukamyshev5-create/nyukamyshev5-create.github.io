@@ -6,242 +6,447 @@ html
     <title>English Dictation</title>
     <style>
         body {
-            font-family: Arial;
+            font-family: Arial, sans-serif;
             max-width: 600px;
-            margin: 50px auto;
+            margin: 30px auto;
             padding: 20px;
-            background: #f0f0f0;
+            background: #f5f5f5;
         }
         .container {
             background: white;
-            padding: 30px;
+            padding: 25px;
             border-radius: 10px;
-            box-shadow: 0 0 10px gray;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
         }
         button {
-            background: blue;
+            background: #4CAF50;
             color: white;
-            padding: 10px 20px;
+            padding: 12px 20px;
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
             margin: 5px;
+            width: 200px;
+        }
+        button:hover {
+            background: #45a049;
         }
         input {
             padding: 10px;
             width: 100%;
             margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
         }
         .hidden {
             display: none;
         }
-        .admin-box {
-            background: #e6f3ff;
+        .section {
+            margin: 20px 0;
             padding: 20px;
-            border-radius: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        .word {
+            font-size: 48px;
+            text-align: center;
+            margin: 30px 0;
+            color: #2196F3;
+        }
+        .timer {
+            font-size: 36px;
+            text-align: center;
+            margin: 20px 0;
+            color: #f44336;
+        }
+        .result-item {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .correct {
+            background: #d4edda;
+            color: #155724;
+        }
+        .incorrect {
+            background: #f8d7da;
+            color: #721c24;
         }
         .message {
-            color: green;
+            text-align: center;
             font-weight: bold;
+            margin: 10px 0;
+        }
+        .admin-btn {
+            background: #ff9800;
+            margin-bottom: 20px;
+        }
+        .admin-btn:hover {
+            background: #e68900;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>English Dictation</h1>
+        <h1>📝 English Dictation</h1>
         
-        <button id="adminBtn">Switch to Admin Mode</button>
+        <!-- Кнопка переключения режимов -->
+        <button id="toggleAdminBtn" class="admin-btn">👤 Перейти в режим администратора</button>
         
-        <!-- Student Section -->
-        <div id="student">
-            <input type="text" id="studentName" placeholder="Your name">
-            <button onclick="startDictation()">Start Dictation</button>
-        </div>
-        
-        <!-- Admin Section -->
-        <div id="admin" class="hidden">
-            <div class="admin-box">
-                <h3>Admin Panel</h3>
-                <input type="password" id="password" placeholder="Enter password">
-                <button onclick="checkPassword()">Login</button>
-                
-                <div id="adminPanel" class="hidden">
-                    <h4>Settings</h4>
-                    <input type="text" id="engWords" placeholder="English words (comma)">
-                    <input type="text" id="rusWords" placeholder="Russian words (comma)">
-                    <input type="number" id="timer" value="20" min="5" max="60">
-                    <button onclick="saveSettings()">💾 SAVE SETTINGS</button>
-                    <p id="message" class="message"></p>
-                </div>
+        <!-- РЕЖИМ УЧЕНИКА -->
+        <div id="studentMode">
+            <div class="section">
+                <h3>👨‍🎓 Вход для ученика</h3>
+                <input type="text" id="studentName" placeholder="Введите ваше имя">
+                <button id="startBtn">Начать диктант</button>
+            </div>
+            
+            <div id="dictationArea" class="hidden">
+                <div class="word" id="russianWord"></div>
+                <div class="timer" id="timerDisplay">20</div>
+                <input type="text" id="answerInput" placeholder="Введите английское слово">
+                <button id="nextBtn">Далее</button>
+                <div id="feedback" class="message"></div>
+            </div>
+            
+            <div id="resultsArea" class="hidden">
+                <h3>📊 Результаты</h3>
+                <div id="resultsList"></div>
+                <button id="againBtn">Начать заново</button>
             </div>
         </div>
         
-        <!-- Dictation -->
-        <div id="dictation" class="hidden">
-            <h2 id="word"></h2>
-            <h3 id="timerDisplay">20</h3>
-            <input type="text" id="answer" placeholder="Type English word">
-            <button onclick="checkAnswer()">Next</button>
-            <p id="fb"></p>
-        </div>
-        
-        <!-- Results -->
-        <div id="results" class="hidden">
-            <h3>Results</h3>
-            <div id="resultList"></div>
-            <button onclick="location.reload()">Again</button>
+        <!-- РЕЖИМ АДМИНИСТРАТОРА -->
+        <div id="adminMode" class="hidden">
+            <div class="section">
+                <h3>🔐 Вход для администратора</h3>
+                <input type="password" id="adminPassword" placeholder="Введите пароль">
+                <button id="loginBtn">Войти</button>
+            </div>
+            
+            <div id="adminPanel" class="hidden">
+                <h3>⚙️ Настройки диктанта</h3>
+                
+                <label>Английские слова (через запятую):</label>
+                <input type="text" id="engWords" value="house, cup, table, cat, dog">
+                
+                <label>Русские слова (через запятую):</label>
+                <input type="text" id="rusWords" value="дом, чашка, стол, кот, собака">
+                
+                <label>Время на слово (секунд):</label>
+                <input type="number" id="timerValue" value="20" min="5" max="60">
+                
+                <button id="saveBtn">💾 Сохранить настройки</button>
+                <div id="saveMessage" class="message"></div>
+                
+                <h4>📋 Результаты учеников:</h4>
+                <div id="allResults"></div>
+            </div>
         </div>
     </div>
 
     <script>
-        // ========== ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ==========
-        let eng = [];
-        let rus = [];
-        let time = 20;
-        let current = 0;
-        let answers = [];
-        let student = '';
+        // ========== ПЕРЕМЕННЫЕ ==========
+        let englishWords = [];
+        let russianWords = [];
+        let timePerWord = 20;
+        let currentIndex = 0;
+        let studentAnswers = [];
+        let studentName = '';
         let timerInterval;
-
+        
+        // Пароль администратора
+        const ADMIN_PASSWORD = "tutorAI";
+        
         // ========== ЗАГРУЗКА ПРИ СТАРТЕ ==========
-        function loadAllSettings() {
-            console.log('Loading settings...');
-            
+        function loadSettings() {
             // Загружаем из localStorage
             let savedEng = localStorage.getItem('englishWords');
             let savedRus = localStorage.getItem('russianWords');
-            let savedTime = localStorage.getItem('timerValue');
+            let savedTime = localStorage.getItem('timePerWord');
             
-            // Если есть сохраненные - используем их
             if (savedEng) {
-                eng = JSON.parse(savedEng);
-                console.log('Loaded English:', eng);
+                englishWords = JSON.parse(savedEng);
             } else {
-                // Если нет - ставим значения по умолчанию
-                eng = ["house", "cup", "table", "cat", "dog"];
-                localStorage.setItem('englishWords', JSON.stringify(eng));
+                englishWords = ["house", "cup", "table", "cat", "dog"];
+                localStorage.setItem('englishWords', JSON.stringify(englishWords));
             }
             
             if (savedRus) {
-                rus = JSON.parse(savedRus);
-                console.log('Loaded Russian:', rus);
+                russianWords = JSON.parse(savedRus);
             } else {
-                rus = ["дом", "чашка", "стол", "кот", "собака"];
-                localStorage.setItem('russianWords', JSON.stringify(rus));
+                russianWords = ["дом", "чашка", "стол", "кот", "собака"];
+                localStorage.setItem('russianWords', JSON.stringify(russianWords));
             }
             
             if (savedTime) {
-                time = parseInt(savedTime);
-                console.log('Loaded time:', time);
+                timePerWord = parseInt(savedTime);
             } else {
-                time = 20;
-                localStorage.setItem('timerValue', time);
+                timePerWord = 20;
+                localStorage.setItem('timePerWord', timePerWord);
             }
             
-            console.log('Final settings:', {eng, rus, time});
+            console.log('Загружены настройки:', englishWords, russianWords, timePerWord);
         }
-
-        // Вызываем загрузку сразу
-        loadAllSettings();
-
-        // ========== СТУДЕНТ ==========
-        function startDictation() {
-            student = document.getElementById('studentName').value;
-            if (!student) {
-                alert('Please enter your name');
+        
+        // Загружаем настройки
+        loadSettings();
+        
+        // ========== ЭЛЕМЕНТЫ ==========
+        const studentMode = document.getElementById('studentMode');
+        const adminMode = document.getElementById('adminMode');
+        const toggleBtn = document.getElementById('toggleAdminBtn');
+        const studentNameInput = document.getElementById('studentName');
+        const startBtn = document.getElementById('startBtn');
+        const dictationArea = document.getElementById('dictationArea');
+        const russianWord = document.getElementById('russianWord');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const answerInput = document.getElementById('answerInput');
+        const nextBtn = document.getElementById('nextBtn');
+        const feedback = document.getElementById('feedback');
+        const resultsArea = document.getElementById('resultsArea');
+        const resultsList = document.getElementById('resultsList');
+        const againBtn = document.getElementById('againBtn');
+        
+        // Админ элементы
+        const adminPassword = document.getElementById('adminPassword');
+        const loginBtn = document.getElementById('loginBtn');
+        const adminPanel = document.getElementById('adminPanel');
+        const engWordsInput = document.getElementById('engWords');
+        const rusWordsInput = document.getElementById('rusWords');
+        const timerValueInput = document.getElementById('timerValue');
+        const saveBtn = document.getElementById('saveBtn');
+        const saveMessage = document.getElementById('saveMessage');
+        const allResultsDiv = document.getElementById('allResults');
+        
+        // ========== ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ ==========
+        toggleBtn.addEventListener('click', function() {
+            if (studentMode.classList.contains('hidden')) {
+                // Переключаем на ученика
+                studentMode.classList.remove('hidden');
+                adminMode.classList.add('hidden');
+                toggleBtn.textContent = '👤 Перейти в режим администратора';
+            } else {
+                // Переключаем на админа
+                studentMode.classList.add('hidden');
+                adminMode.classList.remove('hidden');
+                toggleBtn.textContent = '👨‍🎓 Перейти в режим ученика';
+                
+                // Показываем текущие настройки
+                engWordsInput.value = englishWords.join(', ');
+                rusWordsInput.value = russianWords.join(', ');
+                timerValueInput.value = timePerWord;
+                
+                // Показываем результаты
+                displayAllResults();
+            }
+        });
+        
+        // ========== ВХОД В АДМИНКУ ==========
+        loginBtn.addEventListener('click', function() {
+            if (adminPassword.value === ADMIN_PASSWORD) {
+                adminPanel.classList.remove('hidden');
+                adminPassword.disabled = true;
+                loginBtn.disabled = true;
+            } else {
+                alert('Неверный пароль!');
+            }
+        });
+        
+        // ========== СОХРАНЕНИЕ НАСТРОЕК ==========
+        saveBtn.addEventListener('click', function() {
+            let engText = engWordsInput.value.trim();
+            let rusText = rusWordsInput.value.trim();
+            let newTime = parseInt(timerValueInput.value);
+            
+            if (!engText || !rusText) {
+                alert('Введите слова!');
                 return;
             }
             
-            // ЗАНОВО загружаем настройки перед началом!
-            loadAllSettings();
+            let newEng = engText.split(',').map(w => w.trim());
+            let newRus = rusText.split(',').map(w => w.trim());
             
-            current = 0;
-            answers = [];
-            
-            document.getElementById('student').classList.add('hidden');
-            document.getElementById('dictation').classList.remove('hidden');
-            
-            showWord();
-        }
-
-        function showWord() {
-            if (current >= rus.length) {
-                finish();
+            if (newEng.length !== newRus.length) {
+                alert('Количество английских и русских слов должно совпадать!');
                 return;
             }
             
-            document.getElementById('word').innerText = rus[current];
-            document.getElementById('answer').value = '';
-            document.getElementById('fb').innerText = '';
+            // Сохраняем
+            englishWords = newEng;
+            russianWords = newRus;
+            timePerWord = newTime;
             
-            let timeLeft = time;
-            document.getElementById('timerDisplay').innerText = timeLeft;
+            localStorage.setItem('englishWords', JSON.stringify(englishWords));
+            localStorage.setItem('russianWords', JSON.stringify(russianWords));
+            localStorage.setItem('timePerWord', timePerWord);
+            
+            saveMessage.textContent = '✅ Настройки сохранены!';
+            saveMessage.style.color = 'green';
+            
+            setTimeout(() => {
+                saveMessage.textContent = '';
+            }, 2000);
+        });
+        
+        // ========== НАЧАЛО ДИКТАНТА ==========
+        startBtn.addEventListener('click', function() {
+            studentName = studentNameInput.value.trim();
+            
+            if (!studentName) {
+                alert('Введите имя!');
+                return;
+            }
+            
+            // Загружаем свежие настройки
+            loadSettings();
+            
+            // Проверяем, что слова есть
+            if (englishWords.length === 0 || russianWords.length === 0) {
+                alert('Слова не настроены! Обратитесь к администратору.');
+                return;
+            }
+            
+            // Сбрасываем
+            currentIndex = 0;
+            studentAnswers = [];
+            
+            // Показываем диктант
+            document.querySelector('#studentMode .section').classList.add('hidden');
+            dictationArea.classList.remove('hidden');
+            
+            // Показываем первое слово
+            showNextWord();
+        });
+        
+        function showNextWord() {
+            if (currentIndex >= russianWords.length) {
+                finishDictation();
+                return;
+            }
+            
+            // Показываем русское слово
+            russianWord.textContent = russianWords[currentIndex];
+            answerInput.value = '';
+            feedback.textContent = '';
+            
+            // Запускаем таймер
+            let timeLeft = timePerWord;
+            timerDisplay.textContent = timeLeft;
             
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 timeLeft--;
-                document.getElementById('timerDisplay').innerText = timeLeft;
+                timerDisplay.textContent = timeLeft;
+                
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
                     checkAnswer();
                 }
             }, 1000);
         }
-
+        
         function checkAnswer() {
-            let answer = document.getElementById('answer').value.trim().toLowerCase();
-            let correctWord = eng[current];
+            let answer = answerInput.value.trim().toLowerCase();
+            let correctWord = englishWords[currentIndex];
             let isCorrect = answer === correctWord.toLowerCase();
             
-            answers.push({
-                russian: rus[current],
+            // Сохраняем ответ
+            studentAnswers.push({
+                russian: russianWords[currentIndex],
                 english: correctWord,
-                answer: answer,
+                answer: answer || '(нет ответа)',
                 correct: isCorrect
             });
             
+            // Показываем результат
             if (isCorrect) {
-                document.getElementById('fb').innerText = '✅ Correct!';
-                document.getElementById('fb').style.color = 'green';
+                feedback.textContent = '✅ Правильно!';
+                feedback.style.color = 'green';
             } else {
-                document.getElementById('fb').innerHTML = `❌ Wrong! Correct: <b>${correctWord}</b>`;
-                document.getElementById('fb').style.color = 'red';
+                feedback.textContent = `❌ Неправильно! Правильно: ${correctWord}`;
+                feedback.style.color = 'red';
             }
             
-            current++;
-            setTimeout(showWord, 1500);
+            // Переходим к следующему слову
+            currentIndex++;
+            
+            setTimeout(() => {
+                clearInterval(timerInterval);
+                showNextWord();
+            }, 1500);
         }
-
-        function finish() {
+        
+        nextBtn.addEventListener('click', function() {
+            clearInterval(timerInterval);
+            checkAnswer();
+        });
+        
+        function finishDictation() {
             clearInterval(timerInterval);
             
-            document.getElementById('dictation').classList.add('hidden');
-            document.getElementById('results').classList.remove('hidden');
+            dictationArea.classList.add('hidden');
+            resultsArea.classList.remove('hidden');
             
-            let correctCount = answers.filter(a => a.correct).length;
-            let html = `<h4>Score: ${correctCount}/${answers.length}</h4>`;
+            // Считаем результаты
+            let correctCount = studentAnswers.filter(a => a.correct).length;
+            let totalCount = studentAnswers.length;
+            let percentage = Math.round((correctCount / totalCount) * 100);
             
-            answers.forEach(a => {
-                html += `<p style="color: ${a.correct ? 'green' : 'red'}; border-bottom: 1px solid #eee; padding: 5px;">
-                    <b>${a.russian}</b> → your answer: ${a.answer}<br>
-                    ${a.correct ? '✓' : '✗'} Correct: ${a.english}
-                </p>`;
+            // Показываем результаты
+            let html = `
+                <h4>${studentName}</h4>
+                <p>Правильно: ${correctCount} из ${totalCount} (${percentage}%)</p>
+                <hr>
+            `;
+            
+            studentAnswers.forEach(a => {
+                html += `
+                    <div class="result-item ${a.correct ? 'correct' : 'incorrect'}">
+                        <b>${a.russian}</b> → ваш ответ: ${a.answer}<br>
+                        Правильный ответ: ${a.english}
+                    </div>
+                `;
             });
             
-            document.getElementById('resultList').innerHTML = html;
+            resultsList.innerHTML = html;
             
-            // Отправка на email
-            sendEmail(correctCount, answers.length);
+            // Сохраняем результаты
+            saveResult(correctCount, totalCount, percentage);
+            
+            // Отправляем на email
+            sendEmail(correctCount, totalCount, percentage);
         }
-
-        function sendEmail(correct, total) {
-            let message = `Student: ${student}\n`;
-            message += `Date: ${new Date().toLocaleString()}\n`;
-            message += `Score: ${correct}/${total}\n\n`;
-            message += `Details:\n`;
+        
+        function saveResult(correct, total, percent) {
+            let results = JSON.parse(localStorage.getItem('allResults') || '[]');
             
-            answers.forEach(a => {
-                message += `${a.russian} → your answer: ${a.answer} (correct: ${a.english}) - ${a.correct ? '✓' : '✗'}\n`;
+            results.push({
+                name: studentName,
+                date: new Date().toLocaleString(),
+                correct: correct,
+                total: total,
+                percent: percent,
+                answers: studentAnswers
+            });
+            
+            localStorage.setItem('allResults', JSON.stringify(results));
+        }
+        
+        function sendEmail(correct, total, percent) {
+            let message = `Ученик: ${studentName}\n`;
+            message += `Дата: ${new Date().toLocaleString()}\n`;
+            message += `Результат: ${correct}/${total} (${percent}%)\n\n`;
+            message += `Детали:\n`;
+            
+            studentAnswers.forEach(a => {
+                message += `${a.russian} → ваш ответ: ${a.answer} (правильно: ${a.english}) - ${a.correct ? '✓' : '✗'}\n`;
             });
             
             fetch('https://formsubmit.co/ajax/nyukamyshev@mail.ru', {
@@ -250,68 +455,40 @@ html
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    name: student,
+                    name: studentName,
                     message: message,
-                    _subject: `Dictation Results: ${student}`
+                    _subject: `Результаты диктанта: ${studentName}`
                 })
             })
-            .then(() => alert('Results sent to teacher!'))
-            .catch(() => alert('Results saved locally'));
+            .then(() => console.log('Email отправлен'))
+            .catch(() => console.log('Email не отправлен'));
         }
-
-        // ========== АДМИН ==========
-        document.getElementById('adminBtn').onclick = function() {
-            document.getElementById('student').classList.add('hidden');
-            document.getElementById('admin').classList.remove('hidden');
+        
+        againBtn.addEventListener('click', function() {
+            resultsArea.classList.add('hidden');
+            document.querySelector('#studentMode .section').classList.remove('hidden');
+            studentNameInput.value = '';
+        });
+        
+        function displayAllResults() {
+            let results = JSON.parse(localStorage.getItem('allResults') || '[]');
             
-            // Показываем текущие настройки
-            document.getElementById('engWords').value = eng.join(', ');
-            document.getElementById('rusWords').value = rus.join(', ');
-            document.getElementById('timer').value = time;
-        };
-
-        function checkPassword() {
-            if (document.getElementById('password').value === 'tutorAI') {
-                document.getElementById('adminPanel').classList.remove('hidden');
-                document.getElementById('password').disabled = true;
-            } else {
-                alert('Wrong password!');
-            }
-        }
-
-        function saveSettings() {
-            let engText = document.getElementById('engWords').value.trim();
-            let rusText = document.getElementById('rusWords').value.trim();
-            let newTime = parseInt(document.getElementById('timer').value);
-            
-            if (!engText || !rusText) {
-                alert('Please fill both fields');
+            if (results.length === 0) {
+                allResultsDiv.innerHTML = '<p>Пока нет результатов</p>';
                 return;
             }
             
-            // Разбираем слова
-            let newEng = engText.split(',').map(w => w.trim());
-            let newRus = rusText.split(',').map(w => w.trim());
+            let html = '';
+            results.forEach((r, i) => {
+                html += `
+                    <div class="result-item" style="margin-bottom: 10px;">
+                        <b>${r.name}</b> - ${r.date}<br>
+                        Результат: ${r.correct}/${r.total} (${r.percent}%)
+                    </div>
+                `;
+            });
             
-            if (newEng.length !== newRus.length) {
-                alert('Number of English and Russian words must match!');
-                return;
-            }
-            
-            // Сохраняем в переменные
-            eng = newEng;
-            rus = newRus;
-            time = newTime;
-            
-            // Сохраняем в localStorage
-            localStorage.setItem('englishWords', JSON.stringify(eng));
-            localStorage.setItem('russianWords', JSON.stringify(rus));
-            localStorage.setItem('timerValue', time);
-            
-            // Показываем сообщение
-            document.getElementById('message').innerText = '✅ Settings saved! Students will see new words.';
-            
-            console.log('New settings saved:', eng, rus, time);
+            allResultsDiv.innerHTML = html;
         }
     </script>
 </body>
