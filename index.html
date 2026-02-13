@@ -28,18 +28,28 @@ html
             text-align: center;
             margin-bottom: 25px;
         }
-        button {
-            background-color: #4a6ee0;
-            color: white;
-            cursor: pointer;
-            padding: 12px;
-            margin: 8px 0;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            width: 100%;
+        h2 {
+            color: #444;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
         }
-        input {
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .admin-section {
+            background-color: #f0f7ff;
+            border-left: 4px solid #4a6ee0;
+        }
+        .student-section {
+            background-color: #f9fff0;
+            border-left: 4px solid #6bc04a;
+        }
+        .hidden {
+            display: none;
+        }
+        input, button, textarea {
             padding: 12px;
             margin: 8px 0;
             border: 1px solid #ddd;
@@ -47,8 +57,16 @@ html
             font-size: 16px;
             width: 100%;
         }
-        .hidden {
-            display: none;
+        button {
+            background-color: #4a6ee0;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            border: none;
+        }
+        button:hover {
+            background-color: #3a5ec0;
         }
         .timer {
             font-size: 32px;
@@ -79,15 +97,65 @@ html
             background-color: #ffebee;
             color: #c62828;
         }
+        .student-result-item {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 6px;
+            background-color: #f5f5f5;
+        }
+        .correct {
+            color: #6bc04a;
+        }
+        .incorrect {
+            color: #e05a4a;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>English Dictation App</h1>
         
-        <button id="toggle-admin">Switch to Admin Mode</button>
+        <div class="admin-toggle">
+            <button id="toggle-admin">Switch to Admin Mode</button>
+            <button id="toggle-student" class="hidden">Switch to Student Mode</button>
+        </div>
         
-        <div id="student-section">
+        <div id="password-section" class="section password-section hidden">
+            <h2>Admin Access</h2>
+            <p>Please enter the admin password to continue:</p>
+            <input type="password" id="admin-password" placeholder="Enter password">
+            <button id="submit-password">Submit</button>
+            <div id="password-error" class="password-error"></div>
+        </div>
+        
+        <div id="admin-section" class="section admin-section hidden">
+            <h2>Admin Panel</h2>
+            <div>
+                <label for="words-input">English words (comma separated):</label>
+                <input type="text" id="words-input" placeholder="house, cup, table">
+            </div>
+            <div>
+                <label for="translations-input">Russian translations (comma separated, same order):</label>
+                <input type="text" id="translations-input" placeholder="дом, чашка, стол">
+            </div>
+            <div>
+                <label for="timer-input">Time per word (seconds):</label>
+                <input type="number" id="timer-input" value="20" min="5" max="120">
+            </div>
+            <div>
+                <label for="email-input">Your email for results:</label>
+                <input type="email" id="email-input" value="nyukamyshev@mail.ru">
+            </div>
+            <button id="save-settings">Save Settings</button>
+            <div id="admin-message" style="margin-top: 10px; padding: 10px; border-radius: 5px;"></div>
+            
+            <div class="student-results">
+                <h3>Student Results</h3>
+                <div id="saved-results"></div>
+            </div>
+        </div>
+        
+        <div id="student-section" class="section student-section">
             <div id="name-input-section">
                 <h2>Enter Your Name</h2>
                 <input type="text" id="student-name" placeholder="Your name">
@@ -98,6 +166,9 @@ html
                 <h2>English Dictation</h2>
                 <div class="word-display" id="current-word"></div>
                 <div class="timer" id="timer">20</div>
+                <div class="progress">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
                 <div>
                     <input type="text" id="answer-input" placeholder="Type the English word">
                     <button id="next-word">Next Word</button>
@@ -105,93 +176,236 @@ html
                 <div class="feedback" id="feedback"></div>
             </div>
             
-            <div id="results-section" class="hidden">
+            <div id="results-section" class="hidden results">
                 <h2>Results</h2>
                 <div id="results-list"></div>
                 <button id="restart-dictation">Start Again</button>
             </div>
         </div>
-        
-        <div id="admin-section" class="hidden">
-            <h2>Admin Panel</h2>
-            <input type="password" id="admin-password" placeholder="Admin Password">
-            <button id="submit-password">Submit</button>
-            <div id="admin-controls" class="hidden">
-                <input type="text" id="words-input" placeholder="English words (comma separated)">
-                <input type="text" id="translations-input" placeholder="Russian translations (comma separated)">
-                <input type="number" id="timer-input" value="20" min="5" max="120">
-                <input type="email" id="email-input" value="nyukamyshev@mail.ru">
-                <button id="save-settings">Save Settings</button>
-                <div id="saved-results"></div>
-            </div>
-        </div>
     </div>
 
     <script>
+        // DOM Elements
+        const adminSection = document.getElementById('admin-section');
+        const studentSection = document.getElementById('student-section');
+        const passwordSection = document.getElementById('password-section');
+        const toggleAdminBtn = document.getElementById('toggle-admin');
+        const toggleStudentBtn = document.getElementById('toggle-student');
+        const adminPasswordInput = document.getElementById('admin-password');
+        const submitPasswordBtn = document.getElementById('submit-password');
+        const passwordError = document.getElementById('password-error');
+        const wordsInput = document.getElementById('words-input');
+        const translationsInput = document.getElementById('translations-input');
+        const timerInput = document.getElementById('timer-input');
+        const emailInput = document.getElementById('email-input');
+        const saveSettingsBtn = document.getElementById('save-settings');
+        const adminMessage = document.getElementById('admin-message');
+        const savedResults = document.getElementById('saved-results');
+        const studentNameInput = document.getElementById('student-name');
+        const startDictationBtn = document.getElementById('start-dictation');
+        const dictationSection = document.getElementById('dictation-section');
+        const currentWordDisplay = document.getElementById('current-word');
+        const timerDisplay = document.getElementById('timer');
+        const progressBar = document.getElementById('progress-bar');
+        const answerInput = document.getElementById('answer-input');
+        const nextWordBtn = document.getElementById('next-word');
+        const feedbackDisplay = document.getElementById('feedback');
+        const resultsSection = document.getElementById('results-section');
+        const resultsList = document.getElementById('results-list');
+        const restartDictationBtn = document.getElementById('restart-dictation');
+        const nameInputSection = document.getElementById('name-input-section');
+
         const ADMIN_PASSWORD = "tutorAI";
-        
         let englishWords = ["house", "cup", "table"];
         let russianWords = ["дом", "чашка", "стол"];
-        let timerValue = 20;
-        let adminEmail = 'nyukamyshev@mail.ru';
         let currentWordIndex = 0;
+        let timerValue = 20;
+        let timerInterval;
         let studentAnswers = [];
         let studentName = '';
-        
-        document.getElementById('toggle-admin').addEventListener('click', () => {
-            document.getElementById('student-section').classList.add('hidden');
-            document.getElementById('admin-section').classList.remove('hidden');
+        let adminEmail = 'nyukamyshev@mail.ru';
+        let allResults = [];
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            loadResults();
+            
+            toggleAdminBtn.addEventListener('click', showPasswordSection);
+            toggleStudentBtn.addEventListener('click', showStudentMode);
+            submitPasswordBtn.addEventListener('click', checkAdminPassword);
+            saveSettingsBtn.addEventListener('click', saveSettings);
+            startDictationBtn.addEventListener('click', startDictation);
+            nextWordBtn.addEventListener('click', nextWord);
+            restartDictationBtn.addEventListener('click', restartDictation);
+            answerInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    nextWord();
+                }
+            });
         });
-        
-        document.getElementById('submit-password').addEventListener('click', () => {
-            if (document.getElementById('admin-password').value === ADMIN_PASSWORD) {
-                document.getElementById('admin-controls').classList.remove('hidden');
-                document.getElementById('submit-password').classList.add('hidden');
-                document.getElementById('admin-password').classList.add('hidden');
+
+        function showPasswordSection() {
+            studentSection.classList.add('hidden');
+            adminSection.classList.add('hidden');
+            passwordSection.classList.remove('hidden');
+            toggleAdminBtn.classList.add('hidden');
+            toggleStudentBtn.classList.remove('hidden');
+            adminPasswordInput.focus();
+        }
+
+        function showStudentMode() {
+            passwordSection.classList.add('hidden');
+            adminSection.classList.add('hidden');
+            studentSection.classList.remove('hidden');
+            toggleAdminBtn.classList.remove('hidden');
+            toggleStudentBtn.classList.add('hidden');
+        }
+
+        function checkAdminPassword() {
+            if (adminPasswordInput.value === ADMIN_PASSWORD) {
+                passwordSection.classList.add('hidden');
+                adminSection.classList.remove('hidden');
+                studentSection.classList.add('hidden');
             } else {
-                alert('Wrong password');
+                passwordError.textContent = "Incorrect password";
+                adminPasswordInput.value = '';
             }
-        });
-        
-        document.getElementById('start-dictation').addEventListener('click', () => {
-            studentName = document.getElementById('student-name').value;
+        }
+
+        function loadSettings() {
+            const savedEnglish = localStorage.getItem('englishWords');
+            const savedRussian = localStorage.getItem('russianWords');
+            const savedTimer = localStorage.getItem('timerValue');
+            const savedEmail = localStorage.getItem('adminEmail');
+            
+            if (savedEnglish) {
+                englishWords = JSON.parse(savedEnglish);
+                wordsInput.value = englishWords.join(', ');
+            } else {
+                wordsInput.value = englishWords.join(', ');
+            }
+            
+            if (savedRussian) {
+                russianWords = JSON.parse(savedRussian);
+                translationsInput.value = russianWords.join(', ');
+            } else {
+                translationsInput.value = russianWords.join(', ');
+            }
+            
+            if (savedTimer) {
+                timerValue = parseInt(savedTimer);
+                timerInput.value = timerValue;
+            }
+            
+            if (savedEmail) {
+                adminEmail = savedEmail;
+                emailInput.value = adminEmail;
+            }
+        }
+
+        function saveSettings() {
+            const wordsText = wordsInput.value.trim();
+            const translationsText = translationsInput.value.trim();
+            const timer = parseInt(timerInput.value);
+            const email = emailInput.value.trim();
+            
+            if (!wordsText || !translationsText) {
+                showMessage('Please enter words', 'red');
+                return;
+            }
+            
+            englishWords = wordsText.split(',').map(w => w.trim());
+            russianWords = translationsText.split(',').map(w => w.trim());
+            
+            if (englishWords.length !== russianWords.length) {
+                showMessage('Word counts must match', 'red');
+                return;
+            }
+            
+            timerValue = timer;
+            adminEmail = email;
+            
+            localStorage.setItem('englishWords', JSON.stringify(englishWords));
+            localStorage.setItem('russianWords', JSON.stringify(russianWords));
+            localStorage.setItem('timerValue', timerValue);
+            localStorage.setItem('adminEmail', adminEmail);
+            
+            showMessage('Settings saved!', 'green');
+        }
+
+        function showMessage(text, color) {
+            adminMessage.textContent = text;
+            adminMessage.style.color = color;
+            adminMessage.style.backgroundColor = color === 'green' ? '#e8f5e9' : '#ffebee';
+            setTimeout(() => {
+                adminMessage.textContent = '';
+                adminMessage.style.backgroundColor = 'transparent';
+            }, 2000);
+        }
+
+        function loadResults() {
+            const saved = localStorage.getItem('results');
+            if (saved) {
+                allResults = JSON.parse(saved);
+                displayResults();
+            }
+        }
+
+        function displayResults() {
+            if (allResults.length === 0) {
+                savedResults.innerHTML = '<p>No results yet</p>';
+                return;
+            }
+            let html = '';
+            allResults.forEach(r => {
+                html += `<div class="student-result-item">
+                    <h4>${r.name} - ${r.date}</h4>
+                    <p>Score: ${r.correct}/${r.total}</p>
+                </div>`;
+            });
+            savedResults.innerHTML = html;
+        }
+
+        function startDictation() {
+            studentName = studentNameInput.value.trim();
             if (!studentName) {
                 alert('Please enter your name');
                 return;
             }
-            document.getElementById('name-input-section').classList.add('hidden');
-            document.getElementById('dictation-section').classList.remove('hidden');
-            showWord();
-        });
-        
-        function showWord() {
+            currentWordIndex = 0;
+            studentAnswers = [];
+            nameInputSection.classList.add('hidden');
+            dictationSection.classList.remove('hidden');
+            showCurrentWord();
+        }
+
+        function showCurrentWord() {
             if (currentWordIndex >= russianWords.length) {
                 finishDictation();
                 return;
             }
-            document.getElementById('current-word').textContent = russianWords[currentWordIndex];
-            document.getElementById('answer-input').value = '';
-            document.getElementById('feedback').textContent = '';
+            currentWordDisplay.textContent = russianWords[currentWordIndex];
+            answerInput.value = '';
+            feedbackDisplay.textContent = '';
             startTimer();
         }
-        
+
         function startTimer() {
             let timeLeft = timerValue;
-            document.getElementById('timer').textContent = timeLeft;
-            const timer = setInterval(() => {
+            timerDisplay.textContent = timeLeft;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
                 timeLeft--;
-                document.getElementById('timer').textContent = timeLeft;
+                timerDisplay.textContent = timeLeft;
                 if (timeLeft <= 0) {
-                    clearInterval(timer);
+                    clearInterval(timerInterval);
                     nextWord();
                 }
             }, 1000);
         }
-        
-        document.getElementById('next-word').addEventListener('click', nextWord);
-        
+
         function nextWord() {
-            const answer = document.getElementById('answer-input').value.trim();
+            const answer = answerInput.value.trim();
             const correct = englishWords[currentWordIndex];
             const isCorrect = answer.toLowerCase() === correct.toLowerCase();
             
@@ -203,33 +417,50 @@ html
             });
             
             if (isCorrect) {
-                document.getElementById('feedback').textContent = 'Correct!';
-                document.getElementById('feedback').className = 'feedback correct-feedback';
+                feedbackDisplay.textContent = 'Correct!';
+                feedbackDisplay.className = 'feedback correct-feedback';
             } else {
-                document.getElementById('feedback').textContent = `Incorrect! Correct: ${correct}`;
-                document.getElementById('feedback').className = 'feedback incorrect-feedback';
+                feedbackDisplay.textContent = `Incorrect! Correct: ${correct}`;
+                feedbackDisplay.className = 'feedback incorrect-feedback';
             }
             
-            currentWordIndex++;
-            setTimeout(showWord, 1500);
+            setTimeout(() => {
+                currentWordIndex++;
+                clearInterval(timerInterval);
+                showCurrentWord();
+            }, 1500);
         }
-        
+
         function finishDictation() {
-            document.getElementById('dictation-section').classList.add('hidden');
-            document.getElementById('results-section').classList.remove('hidden');
+            clearInterval(timerInterval);
+            dictationSection.classList.add('hidden');
+            resultsSection.classList.remove('hidden');
+            
+            const correctCount = studentAnswers.filter(a => a.correct).length;
             
             let html = '';
             studentAnswers.forEach(a => {
-                html += `<div style="color: ${a.correct ? 'green' : 'red'}">
+                html += `<div class="${a.correct ? 'correct' : 'incorrect'}">
                     ${a.russian} → your answer: ${a.answer} (correct: ${a.english})
                 </div>`;
             });
-            document.getElementById('results-list').innerHTML = html;
+            resultsList.innerHTML = html;
+            
+            allResults.push({
+                name: studentName,
+                date: new Date().toLocaleString(),
+                correct: correctCount,
+                total: studentAnswers.length
+            });
+            
+            localStorage.setItem('results', JSON.stringify(allResults));
         }
-        
-        document.getElementById('restart-dictation').addEventListener('click', () => {
-            window.location.reload();
-        });
+
+        function restartDictation() {
+            resultsSection.classList.add('hidden');
+            nameInputSection.classList.remove('hidden');
+            studentNameInput.value = '';
+        }
     </script>
 </body>
 </html>
