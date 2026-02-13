@@ -2,35 +2,29 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Админ панель</title>
+<title>Диктант</title>
 </head>
 
 <body>
 
-<h2>Редактор слов</h2>
+<h2>Переведи слова</h2>
 
-Русское слово:<br>
-<input id="ru"><br>
+Имя:<br>
+<input id="studentName"><br><br>
 
-Английское слово:<br>
-<input id="en"><br><br>
+<div id="task"></div>
 
-<button onclick="addPair()">Добавить</button>
-
-<hr>
-
-<h3>Список слов</h3>
-<div id="list"></div>
+<button onclick="sendResult()">Отправить</button>
 
 <script>
 
 const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
+const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 let pairs = [];
 
-// загрузка слов
-async function loadPairs() {
+async function loadWords() {
 
     let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
         headers: { "X-Master-Key": API_KEY }
@@ -40,40 +34,64 @@ async function loadPairs() {
 
     pairs = data.record.pairs || [];
 
-    showPairs();
-}
-
-function showPairs() {
-
     let html = "";
 
-    pairs.forEach(p => {
-        html += `<p>${p.ru} → ${p.en}</p>`;
+    pairs.forEach((p, i) => {
+        html += `
+            ${p.ru}<br>
+            <input id="ans${i}"><br><br>
+        `;
     });
 
-    document.getElementById("list").innerHTML = html;
+    document.getElementById("task").innerHTML = html;
 }
 
-async function addPair() {
+loadWords();
 
-    let ru = document.getElementById("ru").value;
-    let en = document.getElementById("en").value;
+async function sendResult() {
 
-    pairs.push({ ru, en });
+    let name = document.getElementById("studentName").value;
 
-    await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
+    let correct = 0;
+    let answers = [];
+
+    pairs.forEach((p, i) => {
+
+        let ans = document.getElementById(`ans${i}`).value;
+        answers.push(ans);
+
+        if(ans.toLowerCase().trim() === p.en.trim())
+            correct++;
+    });
+
+    let newResult = {
+        name,
+        answers,
+        correct,
+        total: pairs.length,
+        date: new Date().toLocaleString()
+    };
+
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
+        headers: { "X-Master-Key": API_KEY }
+    });
+
+    let data = await res.json();
+    let results = data.record.results || [];
+
+    results.push(newResult);
+
+    await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
             "X-Master-Key": API_KEY
         },
-        body: JSON.stringify({ pairs })
+        body: JSON.stringify({ results })
     });
 
-    loadPairs();
+    alert("Результат отправлен");
 }
-
-loadPairs();
 
 </script>
 
