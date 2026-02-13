@@ -12,11 +12,7 @@
 Введите имя:<br>
 <input id="studentName"><br><br>
 
-Введите слово 1:<br>
-<input id="word1"><br><br>
-
-Введите слово 2:<br>
-<input id="word2"><br><br>
+<div id="task"></div>
 
 <button onclick="sendResult()">Отправить</button>
 
@@ -25,8 +21,14 @@
 <button onclick="adminLogin()">Вход для админа</button>
 
 <script>
-const correctWords = ["кот", "дом"];
 
+const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
+const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
+const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+
+let correctWords = [];
+
+// ===== вход админа =====
 function adminLogin() {
     let pass = prompt("Введите пароль");
 
@@ -37,22 +39,49 @@ function adminLogin() {
     }
 }
 
+// ===== загрузка слов =====
+async function loadWords() {
+
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
+        headers: { "X-Master-Key": API_KEY }
+    });
+
+    let data = await res.json();
+
+    correctWords = data.record.englishWords.split(",");
+
+    let html = "";
+
+    correctWords.forEach((w, i) => {
+        html += `
+            Слово ${i+1}:<br>
+            <input id="word${i}"><br><br>
+        `;
+    });
+
+    document.getElementById("task").innerHTML = html;
+}
+
+loadWords();
+
+// ===== отправка результата =====
 async function sendResult() {
 
     let name = document.getElementById("studentName").value;
 
-    let answers = [
-        document.getElementById("word1").value,
-        document.getElementById("word2").value
-    ];
+    let answers = [];
+
+    correctWords.forEach((_, i) => {
+        answers.push(document.getElementById(`word${i}`).value);
+    });
 
     let correct = 0;
 
     answers.forEach((word, i) => {
-        if(word.toLowerCase() === correctWords[i]) correct++;
+        if(word.toLowerCase().trim() === correctWords[i].trim()) correct++;
     });
 
-    let result = {
+    let newResult = {
         name,
         answers,
         correct,
@@ -60,17 +89,29 @@ async function sendResult() {
         date: new Date().toLocaleString()
     };
 
-    await fetch("https://api.jsonbin.io/v3/b/$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi", {
+    // получаем старые результаты
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
+        headers: { "X-Master-Key": API_KEY }
+    });
+
+    let data = await res.json();
+    let results = data.record.results || [];
+
+    results.push(newResult);
+
+    // сохраняем обратно
+    await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
-            "X-Master-Key": "YOUR_API_KEY"
+            "X-Master-Key": API_KEY
         },
-        body: JSON.stringify(result)
+        body: JSON.stringify({ results })
     });
 
     alert("Результат отправлен");
 }
+
 </script>
 
 </body>
