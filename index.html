@@ -2,45 +2,35 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Диктант</title>
+<title>Админ панель</title>
 </head>
 
 <body>
 
-<h2>Диктант</h2>
+<h2>Редактор слов</h2>
 
-Введите имя:<br>
-<input id="studentName"><br><br>
+Русское слово:<br>
+<input id="ru"><br>
 
-<div id="task"></div>
+Английское слово:<br>
+<input id="en"><br><br>
 
-<button onclick="sendResult()">Отправить</button>
+<button onclick="addPair()">Добавить</button>
 
 <hr>
 
-<button onclick="adminLogin()">Вход для админа</button>
+<h3>Список слов</h3>
+<div id="list"></div>
 
 <script>
 
 const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
-const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-let correctWords = [];
+let pairs = [];
 
-// ===== вход админа =====
-function adminLogin() {
-    let pass = prompt("Введите пароль");
-
-    if (pass === "1234") {
-        window.location.href = "admin.html";
-    } else {
-        alert("Неверный пароль");
-    }
-}
-
-// ===== загрузка слов =====
-async function loadWords() {
+// загрузка слов
+async function loadPairs() {
 
     let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
         headers: { "X-Master-Key": API_KEY }
@@ -48,69 +38,42 @@ async function loadWords() {
 
     let data = await res.json();
 
-    correctWords = data.record.englishWords.split(",");
+    pairs = data.record.pairs || [];
+
+    showPairs();
+}
+
+function showPairs() {
 
     let html = "";
 
-    correctWords.forEach((w, i) => {
-        html += `
-            Слово ${i+1}:<br>
-            <input id="word${i}"><br><br>
-        `;
+    pairs.forEach(p => {
+        html += `<p>${p.ru} → ${p.en}</p>`;
     });
 
-    document.getElementById("task").innerHTML = html;
+    document.getElementById("list").innerHTML = html;
 }
 
-loadWords();
+async function addPair() {
 
-// ===== отправка результата =====
-async function sendResult() {
+    let ru = document.getElementById("ru").value;
+    let en = document.getElementById("en").value;
 
-    let name = document.getElementById("studentName").value;
+    pairs.push({ ru, en });
 
-    let answers = [];
-
-    correctWords.forEach((_, i) => {
-        answers.push(document.getElementById(`word${i}`).value);
-    });
-
-    let correct = 0;
-
-    answers.forEach((word, i) => {
-        if(word.toLowerCase().trim() === correctWords[i].trim()) correct++;
-    });
-
-    let newResult = {
-        name,
-        answers,
-        correct,
-        total: correctWords.length,
-        date: new Date().toLocaleString()
-    };
-
-    // получаем старые результаты
-    let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
-        headers: { "X-Master-Key": API_KEY }
-    });
-
-    let data = await res.json();
-    let results = data.record.results || [];
-
-    results.push(newResult);
-
-    // сохраняем обратно
-    await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}`, {
+    await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
         method: "PUT",
         headers: {
             "Content-Type": "application/json",
             "X-Master-Key": API_KEY
         },
-        body: JSON.stringify({ results })
+        body: JSON.stringify({ pairs })
     });
 
-    alert("Результат отправлен");
+    loadPairs();
 }
+
+loadPairs();
 
 </script>
 
