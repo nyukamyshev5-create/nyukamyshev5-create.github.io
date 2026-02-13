@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>English Dictation</title>
+
+<style>
+body {
+    font-family: Arial;
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f0f2f5;
+}
+.container {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+}
+.hidden { display:none; }
+
+.word {
+    font-size: 28px;
+    text-align:center;
+    margin:20px 0;
+}
+
+.timer {
+    font-size: 32px;
+    text-align:center;
+    color:red;
+}
+
+button {
+    width:100%;
+    padding:12px;
+    margin-top:8px;
+    border:none;
+    border-radius:6px;
+    background:#1a73e8;
+    color:white;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.correct { background:#e6f4e6; padding:8px; margin:5px; }
+.wrong { background:#ffe6e6; padding:8px; margin:5px; }
+
+.progress {
+    text-align:center;
+    margin-top:10px;
+    font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📝 English Dictation</h1>
+
+<!-- MENU -->
+<div id="menu">
+<input id="studentName" placeholder="Ваше имя">
+<button onclick="startDictation()">Начать</button>
+</div>
+
+<!-- DICTATION -->
+<div id="dictation" class="hidden">
+<div class="progress" id="progress"></div>
+<div class="word" id="russianWord"></div>
+<div class="timer" id="timer"></div>
+<input id="answer" placeholder="Введите перевод">
+<button onclick="checkAnswer()">Ответить</button>
+<button onclick="nextQuestion()">Следующий вопрос</button>
+<div id="feedback"></div>
+</div>
+
+<!-- RESULTS -->
+<div id="results" class="hidden">
+<h3>Результаты</h3>
+<div id="resultsList"></div>
+<button onclick="location.reload()">Заново</button>
+</div>
+
+</div>
+
+<script>
+
+/* ====================
+ВОПРОСЫ
+==================== */
+
+const WORDS = [
+    { ru:"кошка", en:"cat" },
+    { ru:"собака", en:"dog" },
+    { ru:"дом", en:"house" }
+];
+
+const TIME_PER_WORD = 30;
+
+
+/* ====================
+ПЕРЕМЕННЫЕ
+==================== */
+
+let questions = [];
+let index = 0;
+let answers = [];
+let timer;
+let studentName = "";
+
+
+/* ====================
+СТАРТ
+==================== */
+
+function startDictation(){
+
+    studentName = document.getElementById("studentName").value.trim();
+
+    if(!studentName){
+        alert("Введите имя");
+        return;
+    }
+
+    // перемешиваем вопросы
+    questions = [...WORDS].sort(()=>Math.random()-0.5);
+
+    index = 0;
+    answers = [];
+
+    document.getElementById("menu").classList.add("hidden");
+    document.getElementById("dictation").classList.remove("hidden");
+
+    showQuestion();
+}
+
+
+/* ====================
+ПОКАЗ ВОПРОСА
+==================== */
+
+function showQuestion(){
+
+    if(index >= questions.length){
+        finish();
+        return;
+    }
+
+    document.getElementById("progress").textContent =
+        `Вопрос ${index+1} из ${questions.length}`;
+
+    document.getElementById("russianWord").textContent =
+        questions[index].ru;
+
+    document.getElementById("answer").value = "";
+    document.getElementById("feedback").innerHTML = "";
+
+    let timeLeft = TIME_PER_WORD;
+    document.getElementById("timer").textContent = timeLeft;
+
+    clearInterval(timer);
+
+    timer = setInterval(()=>{
+        timeLeft--;
+        document.getElementById("timer").textContent = timeLeft;
+
+        if(timeLeft <= 0){
+            clearInterval(timer);
+            checkAnswer();
+        }
+
+    },1000);
+}
+
+
+/* ====================
+ПРОВЕРКА ОТВЕТА
+==================== */
+
+function checkAnswer(){
+
+    clearInterval(timer);
+
+    let answer = document.getElementById("answer")
+        .value.trim().toLowerCase();
+
+    if(!answer){
+        alert("Введите ответ");
+        return;
+    }
+
+    let correct = questions[index].en.toLowerCase();
+
+    let isCorrect = answer === correct;
+
+    answers.push({
+        question:questions[index].ru,
+        correct:correct,
+        answer:answer,
+        ok:isCorrect
+    });
+
+    document.getElementById("feedback").innerHTML =
+        isCorrect ? "✅ Правильно" : `❌ Правильный ответ: ${correct}`;
+}
+
+
+/* ====================
+СЛЕДУЮЩИЙ ВОПРОС
+==================== */
+
+function nextQuestion(){
+    index++;
+    showQuestion();
+}
+
+
+/* ====================
+ФИНИШ
+==================== */
+
+function finish(){
+
+    document.getElementById("dictation").classList.add("hidden");
+    document.getElementById("results").classList.remove("hidden");
+
+    let correctCount = answers.filter(a=>a.ok).length;
+
+    let html = `<h4>${studentName}: ${correctCount}/${answers.length}</h4>`;
+
+    answers.forEach((a,i)=>{
+        html += `
+        <div class="${a.ok?'correct':'wrong'}">
+        <b>${a.question}</b><br>
+        Ваш ответ: ${a.answer}<br>
+        Правильно: ${a.correct}
+        </div>`;
+    });
+
+    document.getElementById("resultsList").innerHTML = html;
+}
+
+</script>
+
+</body>
+</html>
