@@ -2,78 +2,56 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Админ панель</title>
+<title>Панель администратора</title>
 </head>
 
 <body>
 
-<h2>Редактор слов</h2>
+<h1>Результаты учеников</h1>
 
-Русское слово:<br>
-<input id="ru"><br>
+<button onclick="loadResults()">Обновить результаты</button>
 
-Английское слово:<br>
-<input id="en"><br><br>
-
-<button onclick="addPair()">Добавить</button>
-
-<hr>
-
-<h3>Список слов</h3>
-<div id="list"></div>
+<div id="results"></div>
 
 <script>
 
-const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
+const BIN_RESULTS = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-let pairs = [];
+async function loadResults() {
 
-// загрузка слов
-async function loadPairs() {
-
-    let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_RESULTS}/latest`, {
         headers: { "X-Master-Key": API_KEY }
     });
 
     let data = await res.json();
 
-    pairs = data.record.pairs || [];
-
-    showPairs();
-}
-
-function showPairs() {
+    let results = data.record.results || [];
 
     let html = "";
 
-    pairs.forEach(p => {
-        html += `<p>${p.ru} → ${p.en}</p>`;
+    results.reverse().forEach(r => {
+
+        html += `
+            <div style="border:1px solid gray; margin:10px; padding:10px;">
+                <h3>${r.name}</h3>
+                <p><b>Результат:</b> ${r.correct} / ${r.total}</p>
+                <p><b>Дата:</b> ${r.date}</p>
+                
+                <details>
+                    <summary>Показать ответы</summary>
+                    <ul>
+                        ${r.answers.map(a => `<li>${a}</li>`).join("")}
+                    </ul>
+                </details>
+            </div>
+        `;
     });
 
-    document.getElementById("list").innerHTML = html;
+    document.getElementById("results").innerHTML = html;
 }
 
-async function addPair() {
-
-    let ru = document.getElementById("ru").value;
-    let en = document.getElementById("en").value;
-
-    pairs.push({ ru, en });
-
-    await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
-        method: "PUT",
-        headers: {
-            "Content-Type": "application/json",
-            "X-Master-Key": API_KEY
-        },
-        body: JSON.stringify({ pairs })
-    });
-
-    loadPairs();
-}
-
-loadPairs();
+loadResults();
 
 </script>
 
