@@ -1,0 +1,309 @@
+html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>English Dictation App</title>
+    <style>
+        /* ВСТАВЬТЕ СЮДА ВЕСЬ ВАШ СТИЛЬ (CSS) ИЗ ПРЕДЫДУЩЕГО ФАЙЛА */
+        /* Я не копирую CSS сюда для краткости, но вы скопируйте его из вашего файла */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ВЕСЬ ВАШ HTML ИЗ ПРЕДЫДУЩЕГО ФАЙЛА -->
+        <!-- Я не копирую HTML сюда для краткости, но вы скопируйте его -->
+    </div>
+
+    <script>
+        // ============================================
+        // ВАШИ ПЕРЕМЕННЫЕ (оставьте как есть)
+        // ============================================
+        const adminSection = document.getElementById('admin-section');
+        const studentSection = document.getElementById('student-section');
+        // ... и все остальные const, которые у вас были ...
+        
+        const ADMIN_PASSWORD = "tutorAI";
+        let englishWords = [];
+        let russianWords = [];
+        let currentWordIndex = 0;
+        let timerValue = 20;
+        let timerInterval;
+        let studentAnswers = [];
+        let studentName = '';
+        let adminEmail = 'nyukamyshev@mail.ru';
+        let allResults = [];
+        let isAdminMode = false;
+
+        // ============================================
+        // НОВЫЕ КОНСТАНТЫ — ВСТАВЬТЕ СВОИ ДАННЫЕ
+        // ============================================
+        const JSONBIN_API_KEY = '$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi'; // Вставьте сюда ваш Master Key из Шага 2
+        const SETTINGS_BIN_ID = '698f0793d0ea881f40b74a61'; // Вставьте ID первого хранилища (Settings)
+        const RESULTS_BIN_ID = '698f081743b1c97be97be2a9'; // Вставьте ID второго хранилища (Results)
+
+        // ============================================
+        // НОВАЯ ФУНКЦИЯ ЗАГРУЗКИ НАСТРОЕК (С СЕРВЕРА)
+        // ============================================
+        function loadSettings() {
+            fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN_ID}/latest`, {
+                headers: {
+                    'X-Master-Key': JSONBIN_API_KEY
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const settings = data.record;
+                
+                // Заполняем поля в админке
+                wordsInput.value = settings.englishWords;
+                translationsInput.value = settings.russianWords;
+                timerInput.value = settings.timerValue;
+                emailInput.value = settings.adminEmail;
+                
+                // Заполняем переменные
+                englishWords = settings.englishWords.split(',').map(word => word.trim());
+                russianWords = settings.russianWords.split(',').map(word => word.trim());
+                timerValue = settings.timerValue;
+                adminEmail = settings.adminEmail;
+                
+                console.log('Settings loaded from server');
+            })
+            .catch(error => {
+                console.log('No settings on server yet. Using defaults.');
+                // Если нет настроек, показываем пустые поля
+            });
+        }
+
+        // ============================================
+        // НОВАЯ ФУНКЦИЯ СОХРАНЕНИЯ НАСТРОЕК (НА СЕРВЕР)
+        // ============================================
+        function saveSettings() {
+            const englishWordsText = wordsInput.value.trim();
+            const russianWordsText = translationsInput.value.trim();
+            const timer = parseInt(timerInput.value);
+            const email = emailInput.value.trim();
+            
+            if (!englishWordsText || !russianWordsText) {
+                showAdminMessage('Please enter both English words and Russian translations', 'red');
+                return;
+            }
+            
+            const englishArray = englishWordsText.split(',').map(word => word.trim());
+            const russianArray = russianWordsText.split(',').map(word => word.trim());
+            
+            if (englishArray.length !== russianArray.length) {
+                showAdminMessage('Number of English words and Russian translations must match', 'red');
+                return;
+            }
+            
+            const settings = {
+                englishWords: englishWordsText,
+                russianWords: russianWordsText,
+                timerValue: timer,
+                adminEmail: email
+            };
+            
+            fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN_ID}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': JSONBIN_API_KEY
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                englishWords = englishArray;
+                russianWords = russianArray;
+                timerValue = timer;
+                adminEmail = email;
+                showAdminMessage('Settings saved to server! Now ALL students will see these words.', 'green');
+            })
+            .catch(error => {
+                showAdminMessage('Error saving to server', 'red');
+                console.error(error);
+            });
+        }
+
+        // ============================================
+        // НОВАЯ ФУНКЦИЯ ЗАГРУЗКИ РЕЗУЛЬТАТОВ (ДЛЯ АДМИНКИ)
+        // ============================================
+        function loadResults() {
+            fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN_ID}/latest`, {
+                headers: {
+                    'X-Master-Key': JSONBIN_API_KEY
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultsData = data.record;
+                allResults = resultsData.results || [];
+                displaySavedResults();
+            })
+            .catch(error => {
+                console.log('No results yet');
+                savedResults.innerHTML = '<p>No results yet.</p>';
+            });
+        }
+
+        // ============================================
+        // НОВАЯ ФУНКЦИЯ СОХРАНЕНИЯ РЕЗУЛЬТАТОВ (НА СЕРВЕР)
+        // ============================================
+        function saveResults(correctCount, totalCount, percentage) {
+            const result = {
+                studentName: studentName,
+                date: new Date().toLocaleString(),
+                correctCount: correctCount,
+                totalCount: totalCount,
+                percentage: percentage,
+                answers: studentAnswers
+            };
+            
+            // Сначала загружаем старые результаты
+            fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN_ID}/latest`, {
+                headers: {
+                    'X-Master-Key': JSONBIN_API_KEY
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                let resultsData = data.record;
+                if (!resultsData.results) {
+                    resultsData = { results: [] };
+                }
+                
+                resultsData.results.push(result);
+                
+                // Сохраняем обновленные результаты
+                return fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify(resultsData)
+                });
+            })
+            .catch(() => {
+                // Если нет старых результатов, создаем новые
+                return fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify({ results: [result] })
+                });
+            })
+            .then(() => {
+                console.log('Results saved to server');
+            });
+        }
+
+        // ============================================
+        // ВАША ФУНКЦИЯ ПОКАЗА РЕЗУЛЬТАТОВ (оставьте как есть)
+        // ============================================
+        function displaySavedResults() {
+            if (allResults.length === 0) {
+                savedResults.innerHTML = '<p>No results yet.</p>';
+                return;
+            }
+            
+            let resultsHTML = '';
+            allResults.forEach((result, index) => {
+                resultsHTML += `
+                    <div class="student-result-item">
+                        <h4>${result.studentName} - ${result.date}</h4>
+                        <p>Score: ${result.correctCount}/${result.totalCount} (${result.percentage}%)</p>
+                        <details>
+                            <summary>View details</summary>
+                            <div>
+                                ${result.answers.map(answer => `
+                                    <div class="${answer.correct ? 'correct' : 'incorrect'}" style="margin: 5px 0; padding: 5px; background: #f9f9f9;">
+                                        <strong>${answer.russianWord}</strong> → ${answer.englishWord}<br>
+                                        Student: ${answer.studentAnswer} ${answer.correct ? '✓' : '✗'}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </details>
+                    </div>
+                `;
+            });
+            
+            savedResults.innerHTML = resultsHTML;
+        }
+
+        // ============================================
+        // ВАША ФУНКЦИЯ ОЧИСТКИ РЕЗУЛЬТАТОВ (обновленная)
+        // ============================================
+        function clearAllResults() {
+            if (confirm('Are you sure you want to clear all student results?')) {
+                allResults = [];
+                
+                fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': JSONBIN_API_KEY
+                    },
+                    body: JSON.stringify({ results: [] })
+                })
+                .then(() => {
+                    displaySavedResults();
+                });
+            }
+        }
+
+        // ============================================
+        // ВСЕ ВАШИ ОСТАЛЬНЫЕ ФУНКЦИИ (startDictation, nextWord, finishDictation и т.д.)
+        // ОСТАВЬТЕ ИХ КАК ЕСТЬ
+        // ============================================
+        // ... ваш код функций startDictation, showCurrentWord, startTimer, nextWord, finishDictation, sendResultsToEmail, restartDictation ...
+
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ (ОБНОВЛЕННАЯ)
+        // ============================================
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            
+            if (mode === 'admin') {
+                showPasswordSection();
+            } else {
+                showStudentMode();
+            }
+            
+            // Загружаем настройки с сервера
+            loadSettings();
+            
+            // Загружаем результаты с сервера
+            loadResults();
+            
+            updateStudentLink();
+            
+            // Все ваши обработчики событий
+            toggleAdminBtn.addEventListener('click', showPasswordSection);
+            toggleStudentBtn.addEventListener('click', showStudentMode);
+            submitPasswordBtn.addEventListener('click', checkAdminPassword);
+            adminPasswordInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    checkAdminPassword();
+                }
+            });
+            saveSettingsBtn.addEventListener('click', saveSettings);
+            copyLinkBtn.addEventListener('click', copyStudentLink);
+            clearResultsBtn.addEventListener('click', clearAllResults);
+            startDictationBtn.addEventListener('click', startDictation);
+            nextWordBtn.addEventListener('click', nextWord);
+            restartDictationBtn.addEventListener('click', restartDictation);
+            answerInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    nextWord();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
