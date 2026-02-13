@@ -7,54 +7,30 @@
 
 <body>
 
-<h2>Результаты учеников</h2>
+<h2>Редактор слов</h2>
 
-<button onclick="loadResults()">Обновить результаты</button>
+Русское слово:<br>
+<input id="ru"><br>
 
-<div id="results"></div>
+Английское слово:<br>
+<input id="en"><br><br>
+
+<button onclick="addPair()">Добавить</button>
 
 <hr>
 
-<h2>Настройки слов</h2>
-
-Введите слова через запятую:<br>
-<textarea id="words" rows="4" cols="40"></textarea><br><br>
-
-<button onclick="saveWords()">Сохранить слова</button>
+<h3>Список слов</h3>
+<div id="list"></div>
 
 <script>
 
 const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
-const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-// ===== загрузка результатов =====
-async function loadResults() {
+let pairs = [];
 
-    let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
-        headers: { "X-Master-Key": API_KEY }
-    });
-
-    let data = await res.json();
-    let results = data.record.results || [];
-
-    let html = "";
-
-    results.forEach(r => {
-        html += `
-            <p><b>${r.name}</b></p>
-            <p>Ответы: ${r.answers.join(", ")}</p>
-            <p>Правильно: ${r.correct} / ${r.total}</p>
-            <p>${r.date}</p>
-            <hr>
-        `;
-    });
-
-    document.getElementById("results").innerHTML = html;
-}
-
-// ===== загрузка слов =====
-async function loadWords() {
+// загрузка слов
+async function loadPairs() {
 
     let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
         headers: { "X-Master-Key": API_KEY }
@@ -62,15 +38,28 @@ async function loadWords() {
 
     let data = await res.json();
 
-    document.getElementById("words").value = data.record.englishWords;
+    pairs = data.record.pairs || [];
+
+    showPairs();
 }
 
-loadWords();
+function showPairs() {
 
-// ===== сохранение слов =====
-async function saveWords() {
+    let html = "";
 
-    let words = document.getElementById("words").value;
+    pairs.forEach(p => {
+        html += `<p>${p.ru} → ${p.en}</p>`;
+    });
+
+    document.getElementById("list").innerHTML = html;
+}
+
+async function addPair() {
+
+    let ru = document.getElementById("ru").value;
+    let en = document.getElementById("en").value;
+
+    pairs.push({ ru, en });
 
     await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
         method: "PUT",
@@ -78,13 +67,13 @@ async function saveWords() {
             "Content-Type": "application/json",
             "X-Master-Key": API_KEY
         },
-        body: JSON.stringify({
-            englishWords: words
-        })
+        body: JSON.stringify({ pairs })
     });
 
-    alert("Слова сохранены");
+    loadPairs();
 }
+
+loadPairs();
 
 </script>
 
