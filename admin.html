@@ -9,31 +9,83 @@
 
 <h2>Результаты учеников</h2>
 
-<button onclick="loadResults()">Обновить</button>
+<button onclick="loadResults()">Обновить результаты</button>
 
 <div id="results"></div>
 
+<hr>
+
+<h2>Настройки слов</h2>
+
+Введите слова через запятую:<br>
+<textarea id="words" rows="4" cols="40"></textarea><br><br>
+
+<button onclick="saveWords()">Сохранить слова</button>
+
 <script>
+
+const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
+const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
+const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+
+// ===== загрузка результатов =====
 async function loadResults() {
 
-    let res = await fetch("https://api.jsonbin.io/v3/b/YOUR_BIN_ID/latest", {
-        headers: {
-            "X-Master-Key": "YOUR_API_KEY"
-        }
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
+        headers: { "X-Master-Key": API_KEY }
+    });
+
+    let data = await res.json();
+    let results = data.record.results || [];
+
+    let html = "";
+
+    results.forEach(r => {
+        html += `
+            <p><b>${r.name}</b></p>
+            <p>Ответы: ${r.answers.join(", ")}</p>
+            <p>Правильно: ${r.correct} / ${r.total}</p>
+            <p>${r.date}</p>
+            <hr>
+        `;
+    });
+
+    document.getElementById("results").innerHTML = html;
+}
+
+// ===== загрузка слов =====
+async function loadWords() {
+
+    let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
+        headers: { "X-Master-Key": API_KEY }
     });
 
     let data = await res.json();
 
-    let result = data.record;
-
-    document.getElementById("results").innerHTML = `
-        <p>Имя: ${result.name}</p>
-        <p>Ответы: ${result.answers.join(", ")}</p>
-        <p>Правильно: ${result.correct} / ${result.total}</p>
-        <p>Дата: ${result.date}</p>
-        <hr>
-    `;
+    document.getElementById("words").value = data.record.englishWords;
 }
+
+loadWords();
+
+// ===== сохранение слов =====
+async function saveWords() {
+
+    let words = document.getElementById("words").value;
+
+    await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "X-Master-Key": API_KEY
+        },
+        body: JSON.stringify({
+            englishWords: words
+        })
+    });
+
+    alert("Слова сохранены");
+}
+
 </script>
 
 </body>
