@@ -2,58 +2,88 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Панель администратора</title>
+<title>Админ</title>
 </head>
 
 <body>
 
-<h1>Результаты учеников</h1>
+<h1>Админ панель</h1>
 
+<h2>Результаты учеников</h2>
 <button onclick="loadResults()">Обновить результаты</button>
-
 <div id="results"></div>
+
+<hr>
+
+<h2>Настройки слов</h2>
+
+<textarea id="words" rows="10" cols="40"></textarea><br>
+<button onclick="saveWords()">Сохранить</button>
 
 <script>
 
-const BIN_RESULTS = "698f3a5c43b1c97be97c5186";
+const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
+const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 async function loadResults() {
 
-    let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_RESULTS}/latest`, {
-        headers: { "X-Master-Key": API_KEY }
+  let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
+    headers: {"X-Master-Key": API_KEY}
+  });
+
+  let data = await res.json();
+  let html = "";
+
+  data.record.results.forEach(r=>{
+    html += `<b>${r.name}</b> — ${r.score}<br>`;
+    r.answers.forEach(a=>{
+      html += `${a.ru} → ${a.answer} (правильно: ${a.correct})<br>`;
     });
+    html += "<hr>";
+  });
 
-    let data = await res.json();
-
-    let results = data.record.results || [];
-
-    let html = "";
-
-    results.reverse().forEach(r => {
-
-        html += `
-            <div style="border:1px solid gray; margin:10px; padding:10px;">
-                <h3>${r.name}</h3>
-                <p><b>Результат:</b> ${r.correct} / ${r.total}</p>
-                <p><b>Дата:</b> ${r.date}</p>
-                
-                <details>
-                    <summary>Показать ответы</summary>
-                    <ul>
-                        ${r.answers.map(a => `<li>${a}</li>`).join("")}
-                    </ul>
-                </details>
-            </div>
-        `;
-    });
-
-    document.getElementById("results").innerHTML = html;
+  document.getElementById("results").innerHTML = html;
 }
 
-loadResults();
+async function loadWords() {
+
+  let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
+    headers: {"X-Master-Key": API_KEY}
+  });
+
+  let data = await res.json();
+
+  let text = data.record.words
+    .map(w => `${w.ru}:${w.en}`)
+    .join("\n");
+
+  document.getElementById("words").value = text;
+}
+
+async function saveWords() {
+
+  let text = document.getElementById("words").value;
+
+  let words = text.split("\n").map(line=>{
+    let [ru,en] = line.split(":");
+    return {ru:ru.trim(), en:en.trim()};
+  });
+
+  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
+    method:"PUT",
+    headers:{
+      "Content-Type":"application/json",
+      "X-Master-Key": API_KEY
+    },
+    body: JSON.stringify({words})
+  });
+
+  alert("Слова сохранены");
+}
+
+loadWords();
 
 </script>
-
 </body>
 </html>
