@@ -1,3 +1,4 @@
+html
 <!DOCTYPE html>
 <html>
 <head>
@@ -96,6 +97,26 @@
         let student = '';
         let timerInterval;
 
+        // Загружаем сохраненные настройки
+        function loadAllSettings() {
+            let savedEng = localStorage.getItem('eng');
+            let savedRus = localStorage.getItem('rus');
+            let savedTime = localStorage.getItem('time');
+            
+            if (savedEng) {
+                eng = JSON.parse(savedEng);
+            }
+            if (savedRus) {
+                rus = JSON.parse(savedRus);
+            }
+            if (savedTime) {
+                time = parseInt(savedTime);
+            }
+        }
+        
+        // Вызываем загрузку
+        loadAllSettings();
+
         function startDictation() {
             student = document.getElementById('studentName').value;
             if (!student) {
@@ -155,6 +176,7 @@
             document.getElementById('dictation').classList.add('hidden');
             document.getElementById('results').classList.remove('hidden');
             
+            let correctCount = answers.filter(a => a.ok).length;
             let html = '';
             answers.forEach(a => {
                 html += `<p style="color: ${a.ok ? 'green' : 'red'}">
@@ -163,26 +185,65 @@
             });
             document.getElementById('resultList').innerHTML = html;
             
+            // Сохраняем локально
             let results = JSON.parse(localStorage.getItem('results') || '[]');
             results.push({
                 name: student,
                 date: new Date().toLocaleString(),
-                score: answers.filter(a => a.ok).length + '/' + answers.length
+                score: correctCount + '/' + answers.length
             });
             localStorage.setItem('results', JSON.stringify(results));
+            
+            // Отправляем на email
+            sendResultsToEmail(correctCount, answers.length);
         }
 
+        function sendResultsToEmail(correct, total) {
+            let message = `Student: ${student}\n`;
+            message += `Date: ${new Date().toLocaleString()}\n`;
+            message += `Score: ${correct}/${total}\n\n`;
+            message += `Details:\n`;
+            
+            answers.forEach(a => {
+                message += `${a.word} → your answer: ${a.answer} (correct: ${a.correct}) - ${a.ok ? '✓' : '✗'}\n`;
+            });
+            
+            fetch('https://formsubmit.co/ajax/nyukamyshev@mail.ru', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: student,
+                    message: message,
+                    _subject: `Dictation Results: ${student}`,
+                    _template: 'table'
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Email sent!');
+                alert('Results sent to teacher!');
+            })
+            .catch(error => {
+                console.log('Email error:', error);
+            });
+        }
+
+        // Admin functions
         document.getElementById('adminBtn').onclick = () => {
             document.getElementById('student').classList.add('hidden');
             document.getElementById('admin').classList.remove('hidden');
+            // Показываем текущие настройки
+            document.getElementById('engWords').value = eng.join(', ');
+            document.getElementById('rusWords').value = rus.join(', ');
+            document.getElementById('timer').value = time;
         };
 
         function checkPassword() {
             if (document.getElementById('password').value === 'tutorAI') {
                 document.getElementById('adminPanel').classList.remove('hidden');
-                document.getElementById('engWords').value = eng.join(', ');
-                document.getElementById('rusWords').value = rus.join(', ');
-                document.getElementById('timer').value = time;
             } else {
                 alert('Wrong password');
             }
@@ -197,23 +258,15 @@
                 eng = engText.split(',').map(w => w.trim());
                 rus = rusText.split(',').map(w => w.trim());
                 time = newTime;
-                document.getElementById('message').innerText = '✅ Settings saved!';
-                document.getElementById('message').style.color = 'green';
                 
                 localStorage.setItem('eng', JSON.stringify(eng));
                 localStorage.setItem('rus', JSON.stringify(rus));
                 localStorage.setItem('time', time);
+                
+                document.getElementById('message').innerText = '✅ Settings saved! Students will see new words.';
+                document.getElementById('message').style.color = 'green';
             }
         }
-
-        // Load saved settings
-        let savedEng = localStorage.getItem('eng');
-        let savedRus = localStorage.getItem('rus');
-        let savedTime = localStorage.getItem('time');
-        
-        if (savedEng) eng = JSON.parse(savedEng);
-        if (savedRus) rus = JSON.parse(savedRus);
-        if (savedTime) time = parseInt(savedTime);
     </script>
 </body>
 </html>
