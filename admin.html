@@ -31,85 +31,102 @@ const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 async function loadSettings(){
 
- let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-  headers:{"X-Master-Key":API_KEY}
- });
+ try{
+  let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{
+    "X-Access-Key":API_KEY
+   }
+  });
 
- let data = await res.json();
- let record = data.record;
+  let data = await res.json();
+  let record = data.record;
 
- document.getElementById("instruction").value =
-   record.instruction || "";
+  document.getElementById("instruction").value =
+    record.instruction || "";
 
- let students = record.students || {};
- let text="";
+  let students = record.students || {};
+  let text="";
 
- for(let name in students){
+  for(let name in students){
 
-   text+=name+"\n";
+    text+=name+"\n";
 
-   students[name].forEach(w=>{
-     text+=`${w.ru}:${w.en}\n`;
-   });
+    students[name].forEach(w=>{
+      text+=`${w.ru}:${w.en}\n`;
+    });
 
-   text+="---\n";
+    text+="---\n";
+  }
+
+  document.getElementById("students").value=text;
+
+ }catch(e){
+  alert("Ошибка загрузки");
+  console.error(e);
  }
-
- document.getElementById("students").value=text;
 }
 
 async function saveAll(){
 
- let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-  headers:{"X-Master-Key":API_KEY}
- });
+ try{
 
- let data = await res.json();
- let oldRecord = data.record;
-
- let instruction=document.getElementById("instruction").value;
- let raw=document.getElementById("students").value.split("---");
-
- let students={};
-
- raw.forEach(block=>{
-
-   let lines=block.trim().split("\n").filter(l=>l.trim()!="");
-
-   if(lines.length>1){
-
-     let name=lines[0];
-     students[name]=[];
-
-     for(let i=1;i<lines.length;i++){
-       let parts=lines[i].split(":");
-       if(parts.length==2){
-         students[name].push({
-           ru:parts[0].trim(),
-           en:parts[1].trim()
-         });
-       }
-     }
+  let resOld = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{
+    "X-Access-Key":API_KEY
    }
- });
+  });
 
- // 🔥 ВАЖНО: сохраняем results, чтобы попытки не пропадали
- let newRecord = {
-   instruction:instruction,
-   students:students,
-   results: oldRecord.results || {}
- };
+  let oldData = await resOld.json();
+  let oldRecord = oldData.record;
 
- await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-  method:"PUT",
-  headers:{
-    "Content-Type":"application/json",
-    "X-Master-Key":API_KEY
-  },
-  body:JSON.stringify(newRecord)
- });
+  let instruction=document.getElementById("instruction").value;
+  let raw=document.getElementById("students").value.split("---");
 
- alert("Сохранено");
+  let students={};
+
+  raw.forEach(block=>{
+
+    let lines=block.trim().split("\n").filter(l=>l.trim()!="");
+
+    if(lines.length>1){
+
+      let name=lines[0];
+      students[name]=[];
+
+      for(let i=1;i<lines.length;i++){
+        let parts=lines[i].split(":");
+        if(parts.length==2){
+          students[name].push({
+            ru:parts[0].trim(),
+            en:parts[1].trim()
+          });
+        }
+      }
+    }
+  });
+
+  let newRecord = {
+    instruction:instruction,
+    students:students,
+    results: oldRecord.results || {}
+  };
+
+  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+   method:"PUT",
+   headers:{
+     "Content-Type":"application/json",
+     "X-Access-Key":API_KEY
+   },
+   body:JSON.stringify(newRecord)
+  });
+
+  alert("Сохранено");
+
+ }catch(e){
+  alert("Ошибка сохранения");
+  console.error(e);
+ }
+
 }
 
 loadSettings();
