@@ -2,88 +2,127 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Админ</title>
+<title>Админ панель</title>
+<style>
+
+body {
+  font-family: Arial, sans-serif;
+  background:#f4f6f9;
+  padding:30px;
+}
+
+.container {
+  background:white;
+  padding:25px;
+  border-radius:12px;
+  max-width:700px;
+  margin:auto;
+  box-shadow:0 8px 25px rgba(0,0,0,0.1);
+}
+
+textarea {
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ccc;
+  margin-bottom:15px;
+}
+
+button {
+  background:#4e73df;
+  color:white;
+  padding:10px 15px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+button:hover {
+  background:#2e59d9;
+}
+
+h1, h2 {
+  margin-top:0;
+}
+
+</style>
 </head>
 
 <body>
 
+<div class="container">
+
 <h1>Админ панель</h1>
 
-<h2>Результаты учеников</h2>
-<button onclick="loadResults()">Обновить результаты</button>
-<div id="results"></div>
+<h2>Инструкция для учеников</h2>
+<textarea id="instruction" rows="5"></textarea>
+<button onclick="saveAll()">Сохранить изменения</button>
 
 <hr>
 
-<h2>Настройки слов</h2>
+<h2>Слова (формат: русский:английский)</h2>
+<textarea id="words" rows="10"></textarea>
+<button onclick="saveAll()">Сохранить изменения</button>
 
-<textarea id="words" rows="10" cols="40"></textarea><br>
-<button onclick="saveWords()">Сохранить</button>
+</div>
 
 <script>
 
 const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
-const RESULTS_BIN = "698f3a5c43b1c97be97c5186";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-async function loadResults() {
-
-  let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
-    headers: {"X-Master-Key": API_KEY}
-  });
-
-  let data = await res.json();
-  let html = "";
-
-  data.record.results.forEach(r=>{
-    html += `<b>${r.name}</b> — ${r.score}<br>`;
-    r.answers.forEach(a=>{
-      html += `${a.ru} → ${a.answer} (правильно: ${a.correct})<br>`;
-    });
-    html += "<hr>";
-  });
-
-  document.getElementById("results").innerHTML = html;
-}
-
-async function loadWords() {
+async function loadSettings() {
 
   let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
-    headers: {"X-Master-Key": API_KEY}
+    headers: { "X-Master-Key": API_KEY }
   });
 
   let data = await res.json();
 
-  let text = data.record.words
+  document.getElementById("instruction").value =
+    data.record.instruction || "";
+
+  let wordsText = (data.record.words || [])
     .map(w => `${w.ru}:${w.en}`)
     .join("\n");
 
-  document.getElementById("words").value = text;
+  document.getElementById("words").value = wordsText;
 }
 
-async function saveWords() {
+async function saveAll() {
 
-  let text = document.getElementById("words").value;
+  let instruction = document.getElementById("instruction").value.trim();
 
-  let words = text.split("\n").map(line=>{
-    let [ru,en] = line.split(":");
-    return {ru:ru.trim(), en:en.trim()};
+  let wordsRaw = document.getElementById("words").value
+    .split("\n")
+    .filter(line => line.includes(":"));
+
+  let words = wordsRaw.map(line => {
+    let parts = line.split(":");
+    return {
+      ru: parts[0].trim(),
+      en: parts[1].trim()
+    };
   });
 
   await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
-    method:"PUT",
-    headers:{
-      "Content-Type":"application/json",
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
       "X-Master-Key": API_KEY
     },
-    body: JSON.stringify({words})
+    body: JSON.stringify({
+      instruction: instruction,
+      words: words
+    })
   });
 
-  alert("Слова сохранены");
+  alert("Изменения сохранены!");
 }
 
-loadWords();
+loadSettings();
 
 </script>
+
 </body>
 </html>
