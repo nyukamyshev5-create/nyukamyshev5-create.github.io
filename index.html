@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <title>Диктант</title>
+<style>
+.correct { color: green; font-weight: bold; }
+.wrong { color: red; font-weight: bold; }
+.box { margin-bottom: 10px; }
+</style>
 </head>
 
 <body>
@@ -19,7 +24,7 @@
 
 <button onclick="send()">Отправить</button>
 
-<h2 id="result"></h2>
+<div id="result"></div>
 
 <script>
 
@@ -30,17 +35,23 @@ const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 let words = [];
 
 async function loadWords() {
+
   let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
     headers: {"X-Master-Key": API_KEY}
   });
 
   let data = await res.json();
-  words = data.record.words;
+  words = data.record.words || [];
 
   let html = "";
+
   words.forEach((w,i)=>{
-    html += w.ru + "<br>";
-    html += `<input id="w${i}"><br><br>`;
+    html += `
+      <div class="box">
+        ${w.ru}<br>
+        <input id="w${i}">
+      </div>
+    `;
   });
 
   document.getElementById("words").innerHTML = html;
@@ -48,15 +59,37 @@ async function loadWords() {
 
 async function send() {
 
-  let name = document.getElementById("name").value;
+  let name = document.getElementById("name").value.trim();
+
+  if(!name){
+    alert("Введите имя");
+    return;
+  }
 
   let correct = 0;
   let answers = [];
+  let resultHTML = "";
 
   words.forEach((w,i)=>{
-    let val = document.getElementById("w"+i).value.trim().toLowerCase();
 
-    if(val === w.en.toLowerCase()) correct++;
+    let input = document.getElementById("w"+i);
+    let val = input.value.trim().toLowerCase();
+
+    if(val === w.en.toLowerCase()) {
+      correct++;
+      resultHTML += `
+        <p class="correct">
+          ${w.ru} → ${val} ✅
+        </p>
+      `;
+    } else {
+      resultHTML += `
+        <p class="wrong">
+          ${w.ru} → ${val || "(пусто)"} ❌ Ошибка.
+          Правильно: <b>${w.en}</b>
+        </p>
+      `;
+    }
 
     answers.push({
       ru: w.ru,
@@ -65,20 +98,31 @@ async function send() {
     });
   });
 
-  document.getElementById("result").innerText =
-    `Результат: ${correct} из ${words.length}`;
+  let percent = words.length > 0 
+    ? Math.round((correct / words.length) * 100) 
+    : 0;
 
+  document.getElementById("result").innerHTML =
+    `
+      <h2>Результат: ${correct} из ${words.length}</h2>
+      <h3>Процент выполнения: ${percent}%</h3>
+    `
+    + resultHTML;
+
+  // === сохраняем результат ===
   let res = await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}/latest`, {
     headers: {"X-Master-Key": API_KEY}
   });
 
   let data = await res.json();
-  let results = data.record.results;
+  let results = data.record.results || [];
 
   results.push({
     name: name,
     score: `${correct}/${words.length}`,
-    answers: answers
+    percent: percent + "%",
+    answers: answers,
+    date: new Date().toLocaleString()
   });
 
   await fetch(`https://api.jsonbin.io/v3/b/${RESULTS_BIN}`, {
@@ -89,6 +133,7 @@ async function send() {
     },
     body: JSON.stringify({results})
   });
+
 }
 
 function adminLogin() {
@@ -96,11 +141,14 @@ function adminLogin() {
 
   if(pass === "admin123") {
     location.href = "admin.html";
+  } else {
+    alert("Неверный пароль");
   }
 }
 
 loadWords();
 
 </script>
+
 </body>
 </html>
