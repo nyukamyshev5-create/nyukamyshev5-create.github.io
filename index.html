@@ -36,6 +36,11 @@ button:hover{
   background:#2e59d9;
 }
 
+input{
+  padding:5px;
+  margin:5px;
+}
+
 .correct{color:green;}
 .wrong{color:red;}
 
@@ -68,6 +73,8 @@ button:hover{
 ниже 70% → 2
 </div>
 
+<hr>
+
 <div id="words"></div>
 
 <button onclick="send()">Отправить</button>
@@ -84,6 +91,7 @@ const SETTINGS_BIN="698f3a3043b1c97be97c510c";
 const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 let words=[];
+let currentStudent="";
 
 async function loadStudents(){
 
@@ -105,6 +113,8 @@ async function loadStudents(){
 
 async function startTest(name){
 
+ currentStudent=name;
+
  let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
    headers:{"X-Master-Key":API_KEY}
  });
@@ -123,9 +133,10 @@ async function startTest(name){
 
  document.getElementById("words").innerHTML=html;
  document.getElementById("test").style.display="block";
+ document.getElementById("result").innerHTML="";
 }
 
-function send(){
+async function send(){
 
  let correct=0;
  let resultHTML="";
@@ -153,6 +164,31 @@ function send(){
  document.getElementById("result").innerHTML=
  `<h2>Результат: ${percent}%</h2>
   <h2>Оценка: ${grade}</h2><hr>`+resultHTML;
+
+ saveResult(percent);
+}
+
+async function saveResult(percent){
+
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{"X-Master-Key":API_KEY}
+ });
+
+ let data=await res.json();
+ let settings=data.record;
+
+ if(!settings.results) settings.results={};
+
+ settings.results[currentStudent]=percent;
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+   method:"PUT",
+   headers:{
+     "Content-Type":"application/json",
+     "X-Master-Key":API_KEY
+   },
+   body:JSON.stringify(settings)
+ });
 
 }
 
