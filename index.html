@@ -110,4 +110,86 @@ async function startTest(name){
 
  document.getElementById("words").innerHTML=html;
  document.getElementById("test").style.display="block";
- document.getElementById("result").innerHTML=""
+ document.getElementById("result").innerHTML="";
+}
+
+async function send(){
+
+ let correct=0;
+ let details=[];
+
+ words.forEach((w,i)=>{
+
+   let val=document.getElementById("w"+i).value.trim();
+   let isCorrect=val.toLowerCase()===w.en.toLowerCase();
+
+   if(isCorrect) correct++;
+
+   details.push({
+     ru:w.ru,
+     correct:w.en,
+     answer:val,
+     ok:isCorrect
+   });
+
+ });
+
+ let percent=Math.round((correct/words.length)*100);
+
+ let grade=2;
+ if(percent>=90) grade=5;
+ else if(percent>=80) grade=4;
+ else if(percent>=70) grade=3;
+
+ let html=`<h2>Результат: ${percent}%</h2>
+           <h2>Оценка: ${grade}</h2><hr>`;
+
+ details.forEach(d=>{
+   if(d.ok){
+     html+=`<p class="correct">${d.ru} → ${d.answer} ✅</p>`;
+   }else{
+     html+=`<p class="wrong">${d.ru} → ${d.answer||"(пусто)"} — Ошибка ❌ (Правильно: ${d.correct})</p>`;
+   }
+ });
+
+ document.getElementById("result").innerHTML=html;
+
+ saveResult(percent, details);
+}
+
+async function saveResult(percent, details){
+
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{"X-Master-Key":API_KEY}
+ });
+
+ let data=await res.json();
+ let settings=data.record;
+
+ if(!settings.results) settings.results={};
+
+ settings.results[currentStudent]={
+   percent:percent,
+   details:details
+ };
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+   method:"PUT",
+   headers:{
+     "Content-Type":"application/json",
+     "X-Master-Key":API_KEY
+   },
+   body:JSON.stringify(settings)
+ });
+
+}
+
+function goTutor(){
+ window.location.href="tutor.html";
+}
+
+loadStudents();
+
+</script>
+</body>
+</html>
