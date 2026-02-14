@@ -2,122 +2,106 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Админ панель</title>
-<style>
-
-body {
-  font-family: Arial, sans-serif;
-  background:#f4f6f9;
-  padding:30px;
-}
-
-.container {
-  background:white;
-  padding:25px;
-  border-radius:12px;
-  max-width:700px;
-  margin:auto;
-  box-shadow:0 8px 25px rgba(0,0,0,0.1);
-}
-
-textarea {
-  width:100%;
-  padding:10px;
-  border-radius:8px;
-  border:1px solid #ccc;
-  margin-bottom:15px;
-}
-
-button {
-  background:#4e73df;
-  color:white;
-  padding:10px 15px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-}
-
-button:hover {
-  background:#2e59d9;
-}
-
-h1, h2 {
-  margin-top:0;
-}
-
-</style>
+<title>Настройки</title>
 </head>
-
 <body>
 
-<div class="container">
+<h2>Инструкция</h2>
+<textarea id="instruction" rows="4" cols="50"></textarea>
 
-<h1>Админ панель</h1>
+<h2>Диктанты учеников</h2>
+<p>Формат:</p>
+<p>
+Имя ученика<br>
+русское:english<br>
+русское:english<br>
+---<br>
+Следующий ученик...
+</p>
 
-<h2>Инструкция для учеников</h2>
-<textarea id="instruction" rows="5"></textarea>
-<button onclick="saveAll()">Сохранить изменения</button>
+<textarea id="students" rows="15" cols="60"></textarea>
+<br><br>
 
-<hr>
-
-<h2>Слова (формат: русский:английский)</h2>
-<textarea id="words" rows="10"></textarea>
-<button onclick="saveAll()">Сохранить изменения</button>
-
-</div>
+<button onclick="saveAll()">Сохранить</button>
 
 <script>
 
 const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
 const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-async function loadSettings() {
+async function loadSettings(){
 
-  let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`, {
-    headers: { "X-Master-Key": API_KEY }
-  });
+ let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+  headers:{"X-Master-Key":API_KEY}
+ });
 
-  let data = await res.json();
+ let data = await res.json();
 
-  document.getElementById("instruction").value =
-    data.record.instruction || "";
+ document.getElementById("instruction").value =
+   data.record.instruction || "";
 
-  let wordsText = (data.record.words || [])
-    .map(w => `${w.ru}:${w.en}`)
-    .join("\n");
+ let students = data.record.students || {};
 
-  document.getElementById("words").value = wordsText;
+ let text="";
+
+ for(let name in students){
+
+   text+=name+"\n";
+
+   students[name].forEach(w=>{
+     text+=`${w.ru}:${w.en}\n`;
+   });
+
+   text+="---\n";
+ }
+
+ document.getElementById("students").value=text;
+
 }
 
-async function saveAll() {
+async function saveAll(){
 
-  let instruction = document.getElementById("instruction").value.trim();
+ let instruction=document.getElementById("instruction").value;
 
-  let wordsRaw = document.getElementById("words").value
-    .split("\n")
-    .filter(line => line.includes(":"));
+ let raw=document.getElementById("students").value.split("---");
 
-  let words = wordsRaw.map(line => {
-    let parts = line.split(":");
-    return {
-      ru: parts[0].trim(),
-      en: parts[1].trim()
-    };
-  });
+ let students={};
 
-  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Master-Key": API_KEY
-    },
-    body: JSON.stringify({
-      instruction: instruction,
-      words: words
-    })
-  });
+ raw.forEach(block=>{
 
-  alert("Изменения сохранены!");
+   let lines=block.trim().split("\n").filter(l=>l.trim()!="");
+
+   if(lines.length>1){
+
+     let name=lines[0];
+     students[name]=[];
+
+     for(let i=1;i<lines.length;i++){
+       let parts=lines[i].split(":");
+       students[name].push({
+         ru:parts[0].trim(),
+         en:parts[1].trim()
+       });
+     }
+
+   }
+
+ });
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+  method:"PUT",
+  headers:{
+    "Content-Type":"application/json",
+    "X-Master-Key":API_KEY
+  },
+  body:JSON.stringify({
+    instruction:instruction,
+    students:students
+  })
+ });
+
+ alert("Сохранено");
+
 }
 
 loadSettings();
