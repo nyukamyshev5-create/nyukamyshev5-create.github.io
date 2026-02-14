@@ -136,4 +136,33 @@ function send(){
 
    if(val===w.en.toLowerCase()){
      correct++;
-     resultHTML+=`<p class="correct">${w.ru} →
+     resultHTML+=`<p class="correct">${w.ru} → ${val} ✅</p>`;
+   }else{
+     resultHTML+=`<p class="wrong">${w.ru} → ${val||"(пусто)"} ❌ Правильно: <b>${w.en}</b></p>`;
+   }
+
+ });
+
+ let percent=Math.round((correct/words.length)*100);
+
+ let grade=2;
+ if(percent>=90) grade=5;
+ else if(percent>=80) grade=4;
+ else if(percent>=70) grade=3;
+
+ document.getElementById("result").innerHTML=
+ `<h2>Результат: ${percent}%</h2>
+  <h2>Оценка: ${grade}</h2><hr>`+resultHTML;
+
+}
+
+function goTutor(){
+  window.location.href="tutor.html";
+}
+
+loadStudents();
+
+</script>
+
+</body>
+</html>
