@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Tutor</title>
+</head>
+<body>
+
+<h2>Инструкция</h2>
+<textarea id="instruction" rows="4" cols="50"></textarea>
+
+<h2>Создать диктант для ученика</h2>
+
+Имя ученика:<br>
+<input id="studentName"><br><br>
+
+Слова (формат: дом:house):<br>
+<textarea id="words" rows="10" cols="50"></textarea><br><br>
+
+<button onclick="save()">Сохранить</button>
+
+<script>
+
+const SETTINGS_BIN="698f3a3043b1c97be97c510c";
+const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+
+let settings={};
+
+async function load(){
+
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{"X-Master-Key":API_KEY}
+ });
+
+ let data=await res.json();
+
+ settings=data.record;
+
+ document.getElementById("instruction").value=settings.instruction||"";
+}
+
+async function save(){
+
+ let instruction=document.getElementById("instruction").value;
+ let name=document.getElementById("studentName").value.trim();
+ let lines=document.getElementById("words").value.split("\n");
+
+ if(!settings.students) settings.students={};
+
+ settings.instruction=instruction;
+
+ if(name){
+
+   settings.students[name]=[];
+
+   lines.forEach(line=>{
+     if(line.includes(":")){
+       let parts=line.split(":");
+       settings.students[name].push({
+         ru:parts[0].trim(),
+         en:parts[1].trim()
+       });
+     }
+   });
+
+ }
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+   method:"PUT",
+   headers:{
+     "Content-Type":"application/json",
+     "X-Master-Key":API_KEY
+   },
+   body:JSON.stringify(settings)
+ });
+
+ alert("Сохранено");
+}
+
+load();
+
+</script>
+
+</body>
+</html>
