@@ -5,15 +5,48 @@
 <title>Tutor</title>
 
 <style>
-body{font-family:Arial;padding:30px;}
-button{margin:5px;padding:6px 10px;}
+body{
+  font-family:Arial;
+  padding:30px;
+  background:#f4f6f9;
+}
+
+.panel{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  max-width:800px;
+  margin:auto;
+  box-shadow:0 8px 25px rgba(0,0,0,0.1);
+}
+
+button{
+  padding:6px 10px;
+  margin:5px;
+  border:none;
+  border-radius:6px;
+  cursor:pointer;
+  background:#4e73df;
+  color:white;
+}
+
+button:hover{
+  background:#2e59d9;
+}
+
+textarea,input{
+  width:100%;
+  margin:5px 0;
+  padding:6px;
+}
+
 .hidden{display:none;}
 </style>
 
 </head>
 <body>
 
-<div id="login">
+<div id="login" class="panel">
 
 <h2>Вход</h2>
 <input type="password" id="pass" placeholder="Введите пароль">
@@ -21,18 +54,18 @@ button{margin:5px;padding:6px 10px;}
 
 </div>
 
-<div id="panel" class="hidden">
+<div id="panel" class="panel hidden">
 
 <h2>Инструкция</h2>
-<textarea id="instruction" rows="4" cols="50"></textarea>
+<textarea id="instruction" rows="4"></textarea>
 
 <h2>Создать диктант</h2>
 
-Имя ученика:<br>
-<input id="studentName"><br><br>
+Имя ученика:
+<input id="studentName">
 
-Слова (формат: дом:house):<br>
-<textarea id="words" rows="10" cols="50"></textarea><br><br>
+Слова (формат: дом:house):
+<textarea id="words" rows="8"></textarea>
 
 <button onclick="save()">Сохранить</button>
 
@@ -43,8 +76,6 @@ button{margin:5px;padding:6px 10px;}
 
 <hr>
 
-<button onclick="showResults()">Результаты учеников</button>
-
 <div id="results"></div>
 
 </div>
@@ -52,7 +83,6 @@ button{margin:5px;padding:6px 10px;}
 <script>
 
 const PASSWORD="tutorai";
-
 const SETTINGS_BIN="698f3a3043b1c97be97c510c";
 const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
@@ -77,6 +107,9 @@ async function load(){
  let data=await res.json();
  settings=data.record;
 
+ if(!settings.students) settings.students={};
+ if(!settings.results) settings.results={};
+
  document.getElementById("instruction").value=settings.instruction||"";
 
  showStudents();
@@ -88,9 +121,10 @@ function showStudents(){
 
  for(let name in settings.students){
    html+=`
-   ${name}
+   <b>${name}</b>
+   <button onclick="viewResult('${name}')">Результаты</button>
    <button onclick="deleteStudent('${name}')">Удалить</button>
-   <br>`;
+   <br><br>`;
  }
 
  document.getElementById("studentsList").innerHTML=html;
@@ -100,16 +134,9 @@ async function deleteStudent(name){
 
  if(confirm("Удалить "+name+"?")){
    delete settings.students[name];
+   delete settings.results[name];
 
-   await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-     method:"PUT",
-     headers:{
-       "Content-Type":"application/json",
-       "X-Master-Key":API_KEY
-     },
-     body:JSON.stringify(settings)
-   });
-
+   await saveToBin();
    load();
  }
 
@@ -120,9 +147,6 @@ async function save(){
  let instruction=document.getElementById("instruction").value;
  let name=document.getElementById("studentName").value.trim();
  let lines=document.getElementById("words").value.split("\n");
-
- if(!settings.students) settings.students={};
- if(!settings.results) settings.results={};
 
  settings.instruction=instruction;
 
@@ -142,6 +166,14 @@ async function save(){
 
  }
 
+ await saveToBin();
+
+ alert("Сохранено");
+ load();
+}
+
+async function saveToBin(){
+
  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
    method:"PUT",
    headers:{
@@ -151,23 +183,27 @@ async function save(){
    body:JSON.stringify(settings)
  });
 
- alert("Сохранено");
- load();
 }
 
-function showResults(){
+function viewResult(name){
 
- let html="<h3>Результаты:</h3>";
-
- if(!settings.results){
-   html+="Нет результатов";
- }else{
-
-   for(let name in settings.results){
-     html+=`<b>${name}</b>: ${settings.results[name]}%<br>`;
-   }
-
+ if(!settings.results[name]){
+   document.getElementById("results").innerHTML="<p>Нет результатов</p>";
+   return;
  }
+
+ let r=settings.results[name];
+
+ let html=`<h3>${name}</h3>
+           <p><b>Итог:</b> ${r.percent}%</p><hr>`;
+
+ r.details.forEach(d=>{
+   if(d.ok){
+     html+=`<p style="color:green">${d.ru} → ${d.answer} ✅</p>`;
+   }else{
+     html+=`<p style="color:red">${d.ru} → ${d.answer||"(пусто)"} — Ошибка ❌ (Правильно: ${d.correct})</p>`;
+   }
+ });
 
  document.getElementById("results").innerHTML=html;
 }
