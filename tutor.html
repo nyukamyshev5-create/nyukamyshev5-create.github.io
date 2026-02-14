@@ -3,13 +3,30 @@
 <head>
 <meta charset="UTF-8">
 <title>Tutor</title>
+
+<style>
+body{font-family:Arial;padding:30px;}
+button{margin:5px;padding:6px 10px;}
+.hidden{display:none;}
+</style>
+
 </head>
 <body>
+
+<div id="login">
+
+<h2>Вход</h2>
+<input type="password" id="pass" placeholder="Введите пароль">
+<button onclick="check()">Войти</button>
+
+</div>
+
+<div id="panel" class="hidden">
 
 <h2>Инструкция</h2>
 <textarea id="instruction" rows="4" cols="50"></textarea>
 
-<h2>Создать диктант для ученика</h2>
+<h2>Создать диктант</h2>
 
 Имя ученика:<br>
 <input id="studentName"><br><br>
@@ -19,12 +36,37 @@
 
 <button onclick="save()">Сохранить</button>
 
+<hr>
+
+<h2>Ученики</h2>
+<div id="studentsList"></div>
+
+<hr>
+
+<button onclick="showResults()">Результаты учеников</button>
+
+<div id="results"></div>
+
+</div>
+
 <script>
+
+const PASSWORD="tutorai";
 
 const SETTINGS_BIN="698f3a3043b1c97be97c510c";
 const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 let settings={};
+
+function check(){
+ if(document.getElementById("pass").value===PASSWORD){
+   document.getElementById("login").style.display="none";
+   document.getElementById("panel").classList.remove("hidden");
+   load();
+ }else{
+   alert("Неверный пароль");
+ }
+}
 
 async function load(){
 
@@ -33,10 +75,44 @@ async function load(){
  });
 
  let data=await res.json();
-
  settings=data.record;
 
  document.getElementById("instruction").value=settings.instruction||"";
+
+ showStudents();
+}
+
+function showStudents(){
+
+ let html="";
+
+ for(let name in settings.students){
+   html+=`
+   ${name}
+   <button onclick="deleteStudent('${name}')">Удалить</button>
+   <br>`;
+ }
+
+ document.getElementById("studentsList").innerHTML=html;
+}
+
+async function deleteStudent(name){
+
+ if(confirm("Удалить "+name+"?")){
+   delete settings.students[name];
+
+   await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+     method:"PUT",
+     headers:{
+       "Content-Type":"application/json",
+       "X-Master-Key":API_KEY
+     },
+     body:JSON.stringify(settings)
+   });
+
+   load();
+ }
+
 }
 
 async function save(){
@@ -46,6 +122,7 @@ async function save(){
  let lines=document.getElementById("words").value.split("\n");
 
  if(!settings.students) settings.students={};
+ if(!settings.results) settings.results={};
 
  settings.instruction=instruction;
 
@@ -75,9 +152,25 @@ async function save(){
  });
 
  alert("Сохранено");
+ load();
 }
 
-load();
+function showResults(){
+
+ let html="<h3>Результаты:</h3>";
+
+ if(!settings.results){
+   html+="Нет результатов";
+ }else{
+
+   for(let name in settings.results){
+     html+=`<b>${name}</b>: ${settings.results[name]}%<br>`;
+   }
+
+ }
+
+ document.getElementById("results").innerHTML=html;
+}
 
 </script>
 
