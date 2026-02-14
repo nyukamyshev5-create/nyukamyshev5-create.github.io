@@ -34,12 +34,6 @@ button{
   background:#4e73df;
   color:white;
 }
-
-button:hover{
-  background:#2e59d9;
-}
-
-.hidden{display:none;}
 </style>
 
 </head>
@@ -51,7 +45,7 @@ button:hover{
 <input id="studentName">
 <button onclick="start()">Начать</button>
 
-<div id="test" class="hidden">
+<div id="test" style="display:none;">
 <hr>
 <h3 id="instruction"></h3>
 <div id="words"></div>
@@ -72,14 +66,11 @@ let currentName="";
 let currentWords=[];
 
 async function load(){
-
  let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
    headers:{"X-Master-Key":API_KEY}
  });
-
  let data=await res.json();
  settings=data.record;
-
  if(!settings.students) settings.students={};
  if(!settings.results) settings.results={};
 }
@@ -100,16 +91,12 @@ async function start(){
  document.getElementById("instruction").innerText=settings.instruction||"";
 
  let html="";
-
  currentWords.forEach((w,index)=>{
-   html+=`
-   <p>${w.ru}</p>
-   <input id="ans${index}">
-   `;
+   html+=`<p>${w.ru}</p><input id="ans${index}">`;
  });
 
  document.getElementById("words").innerHTML=html;
- document.getElementById("test").classList.remove("hidden");
+ document.getElementById("test").style.display="block";
 }
 
 async function finish(){
@@ -120,7 +107,6 @@ async function finish(){
  currentWords.forEach((w,index)=>{
 
    let answer=document.getElementById("ans"+index).value.trim();
-
    let ok=answer.toLowerCase()===w.en.toLowerCase();
 
    if(ok) correct++;
@@ -138,8 +124,6 @@ async function finish(){
 
  document.getElementById("result").innerHTML=
    `<h3>Ваш результат: ${percent}%</h3>`;
-
- // сохраняем попытку
 
  if(!settings.results[currentName]){
    settings.results[currentName]=[];
