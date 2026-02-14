@@ -2,27 +2,62 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Настройки</title>
+<title>Админ панель</title>
+
+<style>
+body{
+  font-family:Arial;
+  padding:20px;
+}
+
+textarea{
+  width:100%;
+}
+
+.studentBlock{
+  border:1px solid #ccc;
+  padding:10px;
+  margin-bottom:20px;
+}
+
+.firstAttempt{
+  background:#f5f5f5;
+  padding:10px;
+  margin:10px 0;
+}
+
+.percent{
+  font-weight:bold;
+  margin:5px 0;
+}
+
+.correct{color:green;}
+.wrong{color:red;}
+</style>
+
 </head>
 <body>
 
 <h2>Инструкция</h2>
-<textarea id="instruction" rows="4" cols="50"></textarea>
+<textarea id="instruction" rows="4"></textarea>
 
 <h2>Диктанты учеников</h2>
-<p>Формат:</p>
 <p>
+Формат:<br>
 Имя ученика<br>
 русское:english<br>
-русское:english<br>
 ---<br>
-Следующий ученик...
+Следующий ученик
 </p>
 
-<textarea id="students" rows="15" cols="60"></textarea>
+<textarea id="students" rows="10"></textarea>
 <br><br>
 
 <button onclick="saveAll()">Сохранить</button>
+
+<hr>
+<h2>Результаты учеников</h2>
+<div id="results"></div>
 
 <script>
 
@@ -31,107 +66,25 @@ const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 async function loadSettings(){
 
- try{
-  let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{
-    "X-Access-Key":API_KEY
-   }
-  });
+ let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+  headers:{ "X-Master-Key":API_KEY }
+ });
 
-  let data = await res.json();
-  let record = data.record;
+ let data = await res.json();
+ let record = data.record;
 
-  document.getElementById("instruction").value =
-    record.instruction || "";
+ document.getElementById("instruction").value =
+   record.instruction || "";
 
-  let students = record.students || {};
-  let text="";
+ let students = record.students || {};
+ let text="";
 
-  for(let name in students){
-
-    text+=name+"\n";
-
-    students[name].forEach(w=>{
-      text+=`${w.ru}:${w.en}\n`;
-    });
-
-    text+="---\n";
-  }
-
-  document.getElementById("students").value=text;
-
- }catch(e){
-  alert("Ошибка загрузки");
-  console.error(e);
- }
-}
-
-async function saveAll(){
-
- try{
-
-  let resOld = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{
-    "X-Access-Key":API_KEY
-   }
-  });
-
-  let oldData = await resOld.json();
-  let oldRecord = oldData.record;
-
-  let instruction=document.getElementById("instruction").value;
-  let raw=document.getElementById("students").value.split("---");
-
-  let students={};
-
-  raw.forEach(block=>{
-
-    let lines=block.trim().split("\n").filter(l=>l.trim()!="");
-
-    if(lines.length>1){
-
-      let name=lines[0];
-      students[name]=[];
-
-      for(let i=1;i<lines.length;i++){
-        let parts=lines[i].split(":");
-        if(parts.length==2){
-          students[name].push({
-            ru:parts[0].trim(),
-            en:parts[1].trim()
-          });
-        }
-      }
-    }
-  });
-
-  let newRecord = {
-    instruction:instruction,
-    students:students,
-    results: oldRecord.results || {}
-  };
-
-  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-   method:"PUT",
-   headers:{
-     "Content-Type":"application/json",
-     "X-Access-Key":API_KEY
-   },
-   body:JSON.stringify(newRecord)
-  });
-
-  alert("Сохранено");
-
- }catch(e){
-  alert("Ошибка сохранения");
-  console.error(e);
+ for(let name in students){
+   text+=name+"\n";
+   students[name].forEach(w=>{
+     text+=`${w.ru}:${w.en}\n`;
+   });
+   text+="---\n";
  }
 
-}
-
-loadSettings();
-
-</script>
-
-</body>
-</html>
+ document.getElementById("stu
