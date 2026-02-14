@@ -36,12 +36,12 @@ async function loadSettings(){
  });
 
  let data = await res.json();
+ let record = data.record;
 
  document.getElementById("instruction").value =
-   data.record.instruction || "";
+   record.instruction || "";
 
- let students = data.record.students || {};
-
+ let students = record.students || {};
  let text="";
 
  for(let name in students){
@@ -56,13 +56,18 @@ async function loadSettings(){
  }
 
  document.getElementById("students").value=text;
-
 }
 
 async function saveAll(){
 
- let instruction=document.getElementById("instruction").value;
+ let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+  headers:{"X-Master-Key":API_KEY}
+ });
 
+ let data = await res.json();
+ let oldRecord = data.record;
+
+ let instruction=document.getElementById("instruction").value;
  let raw=document.getElementById("students").value.split("---");
 
  let students={};
@@ -78,15 +83,22 @@ async function saveAll(){
 
      for(let i=1;i<lines.length;i++){
        let parts=lines[i].split(":");
-       students[name].push({
-         ru:parts[0].trim(),
-         en:parts[1].trim()
-       });
+       if(parts.length==2){
+         students[name].push({
+           ru:parts[0].trim(),
+           en:parts[1].trim()
+         });
+       }
      }
-
    }
-
  });
+
+ // 🔥 ВАЖНО: сохраняем results, чтобы попытки не пропадали
+ let newRecord = {
+   instruction:instruction,
+   students:students,
+   results: oldRecord.results || {}
+ };
 
  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
   method:"PUT",
@@ -94,14 +106,10 @@ async function saveAll(){
     "Content-Type":"application/json",
     "X-Master-Key":API_KEY
   },
-  body:JSON.stringify({
-    instruction:instruction,
-    students:students
-  })
+  body:JSON.stringify(newRecord)
  });
 
  alert("Сохранено");
-
 }
 
 loadSettings();
