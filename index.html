@@ -170,20 +170,18 @@ async function saveResult(percent, details){
 
  if(!settings.results) settings.results={};
 
- // 🔥 если у ученика нет массива — создаём
  if(!settings.results[currentStudent]){
    settings.results[currentStudent]=[];
  }
 
- // 🔥 если старая структура (один объект) — превращаем в массив
  if(!Array.isArray(settings.results[currentStudent])){
    settings.results[currentStudent]=[settings.results[currentStudent]];
  }
 
- // добавляем новую попытку
  settings.results[currentStudent].push({
    percent:percent,
-   details:details
+   details:details,
+   date:new Date().toLocaleString()
  });
 
  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
@@ -198,7 +196,7 @@ async function saveResult(percent, details){
 }
 
 function goTutor(){
- window.location.href="tutor.html";
+  window.location.href = "admin.html";
 }
 
 loadStudents();
