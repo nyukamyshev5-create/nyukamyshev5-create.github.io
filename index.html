@@ -32,32 +32,20 @@ button{
   color:white;
 }
 
-button:hover{
-  background:#2e59d9;
-}
-
-input{
-  padding:5px;
-  margin:5px;
-}
-
 .correct{color:green;}
 .wrong{color:red;}
 
 #test{display:none;}
 </style>
-
 </head>
 <body>
 
 <div class="container">
 
 <h2>Выберите ученика</h2>
-
 <div id="studentsList"></div>
 
 <hr>
-
 <button onclick="goTutor()">Tutor</button>
 
 <div id="test">
@@ -74,13 +62,11 @@ input{
 </div>
 
 <hr>
-
 <div id="words"></div>
 
 <button onclick="send()">Отправить</button>
 
 <div id="result"></div>
-
 </div>
 
 </div>
@@ -94,33 +80,24 @@ let words=[];
 let currentStudent="";
 
 async function loadStudents(){
-
  let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
    headers:{"X-Master-Key":API_KEY}
  });
-
  let data=await res.json();
  let students=data.record.students||{};
-
  let html="";
-
  for(let name in students){
    html+=`<button onclick="startTest('${name}')">${name}</button>`;
  }
-
  document.getElementById("studentsList").innerHTML=html;
 }
 
 async function startTest(name){
-
  currentStudent=name;
-
  let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
    headers:{"X-Master-Key":API_KEY}
  });
-
  let data=await res.json();
-
  words=data.record.students[name];
 
  document.getElementById("studentTitle").innerText="Ученик: "+name;
@@ -133,72 +110,4 @@ async function startTest(name){
 
  document.getElementById("words").innerHTML=html;
  document.getElementById("test").style.display="block";
- document.getElementById("result").innerHTML="";
-}
-
-async function send(){
-
- let correct=0;
- let resultHTML="";
-
- words.forEach((w,i)=>{
-
-   let val=document.getElementById("w"+i).value.trim().toLowerCase();
-
-   if(val===w.en.toLowerCase()){
-     correct++;
-     resultHTML+=`<p class="correct">${w.ru} → ${val} ✅</p>`;
-   }else{
-     resultHTML+=`<p class="wrong">${w.ru} → ${val||"(пусто)"} ❌ Правильно: <b>${w.en}</b></p>`;
-   }
-
- });
-
- let percent=Math.round((correct/words.length)*100);
-
- let grade=2;
- if(percent>=90) grade=5;
- else if(percent>=80) grade=4;
- else if(percent>=70) grade=3;
-
- document.getElementById("result").innerHTML=
- `<h2>Результат: ${percent}%</h2>
-  <h2>Оценка: ${grade}</h2><hr>`+resultHTML;
-
- saveResult(percent);
-}
-
-async function saveResult(percent){
-
- let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{"X-Master-Key":API_KEY}
- });
-
- let data=await res.json();
- let settings=data.record;
-
- if(!settings.results) settings.results={};
-
- settings.results[currentStudent]=percent;
-
- await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-   method:"PUT",
-   headers:{
-     "Content-Type":"application/json",
-     "X-Master-Key":API_KEY
-   },
-   body:JSON.stringify(settings)
- });
-
-}
-
-function goTutor(){
-  window.location.href="tutor.html";
-}
-
-loadStudents();
-
-</script>
-
-</body>
-</html>
+ document.getElementById("result").innerHTML=""
