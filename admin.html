@@ -8,16 +8,32 @@
 body{
 font-family:Arial;
 padding:20px;
+max-width:800px;
+margin:auto;
 }
 
 textarea{
 width:100%;
-height:120px;
+height:150px;
+margin-top:10px;
+}
+
+input{
+width:100%;
+padding:8px;
+margin-top:10px;
 }
 
 button{
 margin:5px;
 padding:6px 12px;
+cursor:pointer;
+}
+
+.student{
+border:1px solid #ccc;
+padding:10px;
+margin-top:10px;
 }
 </style>
 </head>
@@ -25,107 +41,150 @@ padding:6px 12px;
 
 <h2>Админка</h2>
 
-<input id="name" placeholder="Имя ученика">
+<input id="studentName" placeholder="Имя ученика">
 
-<textarea id="words" placeholder="слова через enter"></textarea>
+<textarea id="words" placeholder="долгосрочный спад = long-term decline"></textarea>
 
-<br>
-
-<button onclick="save()">Сохранить</button>
+<button onclick="saveStudent()">Сохранить ученика</button>
 
 <hr>
 
-<div id="list"></div>
+<div id="students"></div>
 
 <script>
 
-function getData(){
+function getStudents(){
 return JSON.parse(localStorage.getItem("students")||"{}")
 }
 
-function saveData(data){
+function saveStudents(data){
 localStorage.setItem("students",JSON.stringify(data))
 }
 
-function save(){
+function parseWords(text){
 
-const name=document.getElementById("name").value
+return text
+.split("\n")
+.map(line=>{
 
-const words=document.getElementById("words").value.split("\n")
+const parts=line.split("=")
 
-if(!name)return
+if(parts.length<2)return null
 
-const data=getData()
+return {
+ru:parts[0].trim(),
+en:parts[1].trim()
+}
+
+})
+.filter(x=>x)
+
+}
+
+function saveStudent(){
+
+const name=document.getElementById("studentName").value.trim()
+
+const wordsText=document.getElementById("words").value.trim()
+
+if(!name){
+alert("Введите имя")
+return
+}
+
+const data=getStudents()
 
 if(!data[name])
 data[name]={attempts:[]}
 
-data[name].words=words
+data[name].words=parseWords(wordsText)
 
-saveData(data)
+saveStudents(data)
 
-load()
+loadStudents()
+
+alert("Сохранено")
 
 }
 
 function deleteStudent(name){
 
-const data=getData()
+if(!confirm("Удалить ученика?"))return
+
+const data=getStudents()
 
 delete data[name]
 
-saveData(data)
+saveStudents(data)
 
-load()
+loadStudents()
 
 }
 
 function showAttempts(name){
 
-const data=getData()
+const data=getStudents()
+
+const div=document.getElementById("attempts_"+name)
+
+const attempts=data[name].attempts||[]
+
+if(attempts.length===0){
+div.innerHTML="Нет попыток"
+return
+}
 
 let html=""
 
-data[name].attempts.forEach((a,i)=>{
+attempts.forEach((a,i)=>{
 
-html+="<div>Попытка "+(i+1)+" "+a.percent+"%</div>"
+html+=`
+<div>
+<b>Попытка ${i+1}: ${a.percent}%</b><br>
+${a.detail.join("<br>")}
+<hr>
+</div>
+`
 
 })
 
-document.getElementById("attempts_"+name).innerHTML=html
+div.innerHTML=html
 
 }
 
-function load(){
+function loadStudents(){
 
-const data=getData()
+const data=getStudents()
 
-const div=document.getElementById("list")
+const div=document.getElementById("students")
 
 div.innerHTML=""
 
-for(const name in data){
+Object.keys(data).forEach(name=>{
 
 div.innerHTML+=`
-<hr>
-<b>${name}</b>
+<div class="student">
 
-<button onclick="deleteStudent('${name}')">
-Удалить
-</button>
+<b>${name}</b><br>
 
 <button onclick="showAttempts('${name}')">
 Попытки
 </button>
 
+<button onclick="deleteStudent('${name}')">
+Удалить
+</button>
+
 <div id="attempts_${name}"></div>
+
+</div>
 `
 
-}
+})
 
 }
 
-load()
+loadStudents()
 
 </script>
 
