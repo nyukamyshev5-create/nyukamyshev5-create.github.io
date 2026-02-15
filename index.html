@@ -1,89 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Ученики</title>
 <style>
-
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#4facfe,#43e97b);
-height:100vh;
-display:flex;
-justify-content:center;
-align-items:center;
+margin:0;
+padding:20px;
 }
 
 .box{
 background:white;
-padding:30px;
+padding:20px;
 border-radius:10px;
-text-align:center;
+max-width:500px;
+margin:auto;
 }
 
 button{
-padding:10px 20px;
-margin:10px;
+padding:10px;
+margin:5px;
 cursor:pointer;
 }
-
 </style>
 </head>
-
 <body>
 
 <div class="box">
 
-<h2>Выберите ученика</h2>
+<h2>Ученики</h2>
 
 <div id="students"></div>
 
 <br>
 
-<button onclick="location.href='admin.html'">
-Админ
-</button>
+<input id="newStudent" placeholder="Имя ученика">
+<button onclick="addStudent()">Добавить</button>
+
+<br><br>
+
+<button onclick="location.href='admin.html'">Админка</button>
 
 </div>
 
 <script>
 
-const USER="nyukamyshev5"
-const REPO="nyukamyshev5-create"
+const USER="nyukamyshev5-create";
+const REPO="nyukamyshev5-create.github.io";
+const FILE="data.json";
 
 async function load(){
 
-const res=await fetch(
-`https://raw.githubusercontent.com/${USER}/${REPO}/main/data.json?nocache=`+Date.now()
-)
+const res=await fetch(FILE+"?"+Date.now());
+const data=await res.json();
 
-const data=await res.json()
-
-const div=document.getElementById("students")
-
-div.innerHTML=""
+const div=document.getElementById("students");
+div.innerHTML="";
 
 for(const name in data.students){
 
-div.innerHTML+=`
-<button onclick="start('${name}')">
-${name}
-</button>
-`
+const btn=document.createElement("button");
+btn.innerText=name;
+
+btn.onclick=()=>{
+localStorage.setItem("student",name);
+location.href="tutor.html";
+};
+
+div.appendChild(btn);
 
 }
 
 }
 
-function start(name){
+async function addStudent(){
 
-localStorage.setItem("student",name)
+const name=document.getElementById("newStudent").value.trim();
 
-location.href="tutor.html"
+if(!name)return;
+
+const res=await fetch(FILE+"?"+Date.now());
+const data=await res.json();
+
+if(!data.students[name]){
+
+data.students[name]={words:[],attempts:[]};
+
+await save(data);
 
 }
 
-load()
+load();
+
+}
+
+async function save(data){
+
+const token=prompt("Введите GitHub token");
+
+const get=await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`);
+
+const json=await get.json();
+
+await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`,{
+
+method:"PUT",
+
+headers:{
+Authorization:"Bearer "+token,
+"Content-Type":"application/json"
+},
+
+body:JSON.stringify({
+
+message:"update",
+
+content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
+
+sha:json.sha
+
+})
+
+});
+
+}
+
+load();
 
 </script>
 
