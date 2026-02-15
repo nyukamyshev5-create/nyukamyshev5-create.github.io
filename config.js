@@ -4,7 +4,7 @@ const CONFIG = {
   file: "data.json",
   branch: "main",
 
-  token: "PASTE_YOUR_TOKEN_HERE",
+  token: "В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",
 
-  adminPassword: "1234"
+  adminPassword: "tutorai"
 };
