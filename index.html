@@ -1,62 +1,49 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Диктанты</title>
-
-<meta name="autocomplete" content="off">
 
 <style>
 
 body{
 font-family:Arial;
-background:linear-gradient(90deg,#4e73df,#1cc88a);
+background:linear-gradient(135deg,#4e73df,#1cc88a);
 margin:0;
+padding:0;
+text-align:center;
 }
 
 .container{
 background:white;
-width:800px;
+max-width:800px;
 margin:40px auto;
 padding:30px;
-border-radius:10px;
+border-radius:15px;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
 button{
-padding:10px 20px;
+padding:10px 15px;
 margin:5px;
 border:none;
-border-radius:6px;
+border-radius:8px;
+cursor:pointer;
 background:#4e73df;
 color:white;
-cursor:pointer;
 }
 
-button:hover{
-background:#2e59d9;
-}
-
-input,textarea{
-padding:5px;
+input{
+padding:8px;
 margin:5px;
-width:300px;
+font-size:16px;
 }
 
-.hidden{
-display:none;
-}
+.correct{color:green;}
+.wrong{color:red;}
 
-.result{
-background:#f8f9fc;
-padding:10px;
-margin-top:10px;
-}
-
-.admin{
-background:#fff3cd;
-padding:10px;
-margin-top:20px;
-}
+#test{display:none;}
+#adminPanel{display:none;}
 
 </style>
 </head>
@@ -64,43 +51,39 @@ margin-top:20px;
 
 <div class="container">
 
-<h2>Ученики</h2>
+<h2>Выберите ученика</h2>
+<div id="studentsList"></div>
 
-<div id="students"></div>
+<button onclick="showAdminLogin()">Админ</button>
 
-<button onclick="adminLogin()">Админ</button>
+<div id="adminLogin" style="display:none;">
+<input type="password" id="adminPass" placeholder="Пароль">
+<button onclick="loginAdmin()">Войти</button>
+</div>
 
-<hr>
+<div id="adminPanel">
 
-<div id="testArea" class="hidden">
+<h3>Добавить ученика</h3>
+
+<input id="newStudentName" placeholder="Имя"><br>
+
+<textarea id="newStudentWords" rows="10" cols="40"
+placeholder="дом=house&#10;работа=work"></textarea><br>
+
+<button onclick="addStudent()">Добавить</button>
+
+</div>
+
+<div id="test">
 
 <h3 id="studentTitle"></h3>
 
 <div id="words"></div>
 
-<button onclick="submitTest()">Отправить</button>
-
+<button onclick="send()">Отправить</button>
 <button onclick="restart()">Начать новую попытку</button>
 
 <div id="result"></div>
-
-</div>
-
-<div id="adminArea" class="hidden" class="admin">
-
-<h3>Админ панель</h3>
-
-<div id="adminStudents"></div>
-
-<h4>Добавить ученика</h4>
-
-<input id="newStudentName" placeholder="Имя">
-<br>
-<textarea id="newWords" placeholder="пример:
-дом=house
-кот=cat"></textarea>
-<br>
-<button onclick="addStudent()">Добавить</button>
 
 </div>
 
@@ -108,294 +91,172 @@ margin-top:20px;
 
 <script>
 
-/////////////////////////////////////////////////
-// ПАРОЛЬ
-/////////////////////////////////////////////////
-
 const ADMIN_PASSWORD="tutorai";
 
-/////////////////////////////////////////////////
-// БАЗА СЛОВ
-/////////////////////////////////////////////////
+let students=JSON.parse(localStorage.getItem("studentsDB"))||{};
+let currentStudent="";
+let words=[];
 
-let students = JSON.parse(localStorage.getItem("studentsDB")) || {
+updateStudents();
 
-"Полина":[["исследование","research"],["карьера","career"]],
-"Ирина":[["пухлый","chubby"],["злодей","villain"]],
-"Кира":[["дом","house"],["работа","work"]]
-
-};
-
-/////////////////////////////////////////////////
-// РЕЗУЛЬТАТЫ
-/////////////////////////////////////////////////
-
-let results = JSON.parse(localStorage.getItem("resultsDB")) || {};
-
-/////////////////////////////////////////////////
-// сохранить
-/////////////////////////////////////////////////
-
-function saveAll(){
+function updateStudents(){
 
 localStorage.setItem("studentsDB",JSON.stringify(students));
-localStorage.setItem("resultsDB",JSON.stringify(results));
+
+let html="";
+
+for(let name in students){
+
+html+=`<button onclick="startTest('${name}')">${name}</button>`;
 
 }
 
-/////////////////////////////////////////////////
-// защита
-/////////////////////////////////////////////////
-
-document.addEventListener("paste",e=>e.preventDefault());
-document.addEventListener("copy",e=>e.preventDefault());
-document.addEventListener("contextmenu",e=>e.preventDefault());
-
-/////////////////////////////////////////////////
-// показать учеников
-/////////////////////////////////////////////////
-
-function renderStudents(){
-
-const div=document.getElementById("students");
-
-div.innerHTML="";
-
-Object.keys(students).forEach(name=>{
-
-const btn=document.createElement("button");
-
-btn.innerText=name;
-
-btn.onclick=()=>startTest(name);
-
-div.appendChild(btn);
-
-});
+document.getElementById("studentsList").innerHTML=html;
 
 }
-
-renderStudents();
-
-/////////////////////////////////////////////////
-// тест
-/////////////////////////////////////////////////
-
-let currentStudent="";
-let inputs=[];
 
 function startTest(name){
 
 currentStudent=name;
+words=students[name];
 
 document.getElementById("studentTitle").innerText=name;
 
-const wordsDiv=document.getElementById("words");
+let html="";
 
-wordsDiv.innerHTML="";
+words.forEach((w,i)=>{
 
-inputs=[];
+html+=`
+<div>
 
-students[name].forEach(word=>{
+${w[0]}
 
-const div=document.createElement("div");
+<input
 
-div.innerHTML=word[0]+" <input>";
+id="w${i}"
 
-wordsDiv.appendChild(div);
+autocomplete="off"
+autocorrect="off"
+autocapitalize="off"
+spellcheck="false"
 
-inputs.push(div.querySelector("input"));
+onpaste="return false"
+ondrop="return false"
+
+oncontextmenu="return false"
+
+onkeydown="return blockKeys(event)"
+
+>
+
+</div>
+`;
 
 });
 
-document.getElementById("testArea").classList.remove("hidden");
+document.getElementById("words").innerHTML=html;
+
+document.getElementById("test").style.display="block";
 
 }
 
-/////////////////////////////////////////////////
-// проверка
-/////////////////////////////////////////////////
+function blockKeys(e){
 
-function normalize(t){
+if(e.ctrlKey && (
+e.key==="v" ||
+e.key==="c" ||
+e.key==="x" ||
+e.key==="Insert"
+)) return false;
 
-return t.toLowerCase().trim();
+return true;
 
 }
 
-function submitTest(){
+function send(){
 
 let correct=0;
-let details="";
-let total=students[currentStudent].length;
 
-students[currentStudent].forEach((word,i)=>{
+words.forEach((w,i)=>{
 
-let answer=normalize(inputs[i].value);
+let val=document.getElementById("w"+i).value.trim();
 
-let correctAnswer=normalize(word[1]);
-
-if(answer===correctAnswer){
-
+if(val.toLowerCase()===w[1].toLowerCase())
 correct++;
-details+="✅ "+word[0]+"<br>";
-
-}else{
-
-details+="❌ "+word[0]+" → "+word[1]+"<br>";
-
-}
 
 });
 
-let percent=Math.round(correct/total*100);
-
-if(!results[currentStudent])
-results[currentStudent]=[];
-
-results[currentStudent].push({
-
-date:new Date().toLocaleString(),
-percent:percent,
-details:details
-
-});
-
-saveAll();
+let percent=Math.round(correct/words.length*100);
 
 document.getElementById("result").innerHTML=
-"<div class='result'>"+
-"Процент: "+percent+"%<br>"+details+
-"</div>";
+"<h3>Результат: "+percent+"%</h3>";
 
 }
-
-/////////////////////////////////////////////////
-// новая попытка
-/////////////////////////////////////////////////
 
 function restart(){
 
-inputs.forEach(i=>i.value="");
-
-document.getElementById("result").innerHTML="";
+startTest(currentStudent);
 
 }
 
-/////////////////////////////////////////////////
-// админ вход
-/////////////////////////////////////////////////
+function showAdminLogin(){
 
-function adminLogin(){
+document.getElementById("adminLogin").style.display="block";
 
-let pass=prompt("Пароль");
+}
 
-if(pass!==ADMIN_PASSWORD){
+function loginAdmin(){
+
+let pass=document.getElementById("adminPass").value;
+
+if(pass===ADMIN_PASSWORD){
+
+document.getElementById("adminPanel").style.display="block";
+
+}else{
+
 alert("Неверный пароль");
-return;
-}
-
-document.getElementById("adminArea").classList.remove("hidden");
-
-renderAdmin();
 
 }
 
-/////////////////////////////////////////////////
-// админ список
-/////////////////////////////////////////////////
-
-function renderAdmin(){
-
-const div=document.getElementById("adminStudents");
-
-div.innerHTML="";
-
-Object.keys(students).forEach(name=>{
-
-const block=document.createElement("div");
-
-block.innerHTML=
-"<b>"+name+"</b> "+
-"<button onclick='showResults(\""+name+"\")'>Результаты</button>"+
-"<button onclick='deleteStudent(\""+name+"\")'>Удалить</button>";
-
-div.appendChild(block);
-
-});
-
 }
-
-/////////////////////////////////////////////////
-// показать результаты
-/////////////////////////////////////////////////
-
-function showResults(name){
-
-let data=results[name]||[];
-
-let html="<h4>"+name+"</h4>";
-
-data.forEach(r=>{
-
-html+="<div class='result'>"+
-r.date+" — "+r.percent+"%<br>"+
-r.details+
-"</div>";
-
-});
-
-document.getElementById("adminStudents").innerHTML=html+
-"<button onclick='renderAdmin()'>Назад</button>";
-
-}
-
-/////////////////////////////////////////////////
-// удалить ученика
-/////////////////////////////////////////////////
-
-function deleteStudent(name){
-
-if(!confirm("Удалить "+name+"?"))return;
-
-delete students[name];
-delete results[name];
-
-saveAll();
-
-renderStudents();
-renderAdmin();
-
-}
-
-/////////////////////////////////////////////////
-// добавить ученика
-/////////////////////////////////////////////////
 
 function addStudent(){
 
-let name=document.getElementById("newStudentName").value;
+let name=document.getElementById("newStudentName").value.trim();
 
-let text=document.getElementById("newWords").value;
+let raw=document.getElementById("newStudentWords").value.trim();
 
-let lines=text.split("\n");
+if(!name||!raw){
 
-let words=[];
+alert("Заполните поля");
+
+return;
+
+}
+
+let lines=raw.split("\n");
+
+students[name]=[];
 
 lines.forEach(line=>{
 
 let parts=line.split("=");
 
-if(parts.length===2)
-words.push([parts[0],parts[1]]);
+if(parts.length===2){
+
+students[name].push([
+parts[0].trim(),
+parts[1].trim()
+]);
+
+}
 
 });
 
-students[name]=words;
+updateStudents();
 
-saveAll();
-
-renderStudents();
-renderAdmin();
+alert("Ученик добавлен");
 
 }
 
