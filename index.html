@@ -1,317 +1,287 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Диктанты</title>
 
-<style>
+<meta name="autocomplete" content="off">
+<meta name="autofill" content="off">
+<meta name="format-detection" content="telephone=no">
+<meta http-equiv="Cache-Control" content="no-store">
 
+<style>
 body{
-font-family:Arial;
-background:linear-gradient(135deg,#4e73df,#1cc88a);
-margin:0;
-padding:0;
-text-align:center;
+    font-family: Arial;
+    background: linear-gradient(135deg,#4e73df,#1cc88a);
+    margin:0;
 }
 
 .container{
-background:white;
-max-width:700px;
-margin:40px auto;
-padding:30px;
-border-radius:15px;
-box-shadow:0 10px 30px rgba(0,0,0,0.2);
+    background:white;
+    width:700px;
+    margin:40px auto;
+    padding:30px;
+    border-radius:15px;
+    text-align:center;
 }
 
 button{
-padding:10px 15px;
-margin:5px;
-border:none;
-border-radius:8px;
-cursor:pointer;
-background:#4e73df;
-color:white;
-font-size:16px;
+    padding:10px 20px;
+    margin:5px;
+    border:none;
+    border-radius:8px;
+    background:#4e73df;
+    color:white;
+    cursor:pointer;
 }
 
 button:hover{
-background:#2e59d9;
+    background:#2e59d9;
 }
 
-.secureInput{
-display:inline-block;
-min-width:200px;
-border:2px solid #ddd;
-padding:6px;
-margin:5px;
-border-radius:6px;
-outline:none;
+input{
+    padding:8px;
+    margin:5px;
+    width:250px;
 }
 
-.correct{
-color:green;
-font-weight:bold;
+.hidden{
+    display:none;
 }
-
-.wrong{
-color:red;
-font-weight:bold;
-}
-
 </style>
-
 </head>
-<body>
+
+<body oncopy="return false" onpaste="return false" oncut="return false">
 
 <div class="container">
 
 <h2>Выберите ученика</h2>
 
-<div id="studentsList"></div>
+<div id="students"></div>
 
 <hr>
 
-<button onclick="loginTutor()">Tutor</button>
+<button onclick="enterTutor()">Tutor</button>
 
-<div id="testArea"></div>
+<div id="testBlock" class="hidden">
 
-<div id="resultArea"></div>
+<h3 id="studentName"></h3>
+
+<p>Переведи:</p>
+
+<div id="questions"></div>
+
+<button onclick="submitTest()">Отправить</button>
+
+<br><br>
+
+<button onclick="newAttempt()">Пройти тест заново</button>
+
+<p id="result"></p>
+
+</div>
 
 </div>
 
 <script>
 
-//////////////////////////////////////////////////
-// загрузка данных
-//////////////////////////////////////////////////
+// ===== ЗАЩИТА =====
 
-let data;
+// блок вставки
+document.addEventListener("paste", e => e.preventDefault());
+
+// блок ctrl+v
+document.addEventListener("keydown", e=>{
+    if(e.ctrlKey && e.key==="v") e.preventDefault();
+});
+
+// отключение autocomplete полностью
+document.addEventListener("focusin", e=>{
+    if(e.target.tagName==="INPUT"){
+        e.target.setAttribute("autocomplete","new-password");
+        e.target.setAttribute("readonly",true);
+        setTimeout(()=>e.target.removeAttribute("readonly"),100);
+    }
+});
+
+// ===== УЧЕНИКИ ПО УМОЛЧАНИЮ =====
+
+const defaultStudents = [
+"Полина",
+"Ирина",
+"Кира",
+"Алексей",
+"Григорий",
+"Роман",
+"Владимир",
+"Дарья",
+"Ксения",
+"Виктория"
+];
+
+// восстановление если пропали
+if(!localStorage.getItem("students")){
+    localStorage.setItem("students",JSON.stringify(defaultStudents));
+}
+
+// ===== ВОПРОСЫ =====
+
+const dictation = [
+{ru:"запрет",en:"ban"},
+{ru:"юмор",en:"humor"},
+{ru:"следствие",en:"consequence"},
+{ru:"как следствие",en:"as a consequence"}
+];
+
+// ===== ЗАГРУЗКА УЧЕНИКОВ =====
+
+function loadStudents(){
+
+    const container=document.getElementById("students");
+
+    const students=JSON.parse(localStorage.getItem("students"));
+
+    container.innerHTML="";
+
+    students.forEach(name=>{
+
+        const btn=document.createElement("button");
+
+        btn.textContent=name;
+
+        btn.onclick=()=>selectStudent(name);
+
+        container.appendChild(btn);
+
+    });
+
+}
+
+// ===== ВЫБОР УЧЕНИКА =====
+
 let currentStudent="";
-let words=[];
-let answers=[];
 
-function loadData(){
+function selectStudent(name){
 
-let local=localStorage.getItem("dictationData");
+    currentStudent=name;
 
-if(local)
-data=JSON.parse(local);
+    document.getElementById("studentName").innerText="Ученик: "+name;
 
-else{
+    document.getElementById("testBlock").classList.remove("hidden");
 
-data={
-instruction:"Введите перевод",
-students:{},
-results:{}
-};
+    loadQuestions();
 
 }
 
-showStudents();
+// ===== ЗАГРУЗКА ВОПРОСОВ =====
+
+function loadQuestions(){
+
+    const container=document.getElementById("questions");
+
+    container.innerHTML="";
+
+    dictation.forEach((q,i)=>{
+
+        const div=document.createElement("div");
+
+        div.innerHTML=`
+        ${q.ru}<br>
+        <input 
+            type="text"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            name="q${Math.random()}"
+            data-index="${i}"
+        ><br><br>
+        `;
+
+        container.appendChild(div);
+
+    });
 
 }
 
-//////////////////////////////////////////////////
-// показать учеников
-//////////////////////////////////////////////////
+// ===== ПРОВЕРКА =====
 
-function showStudents(){
+function submitTest(){
 
-let html="";
+    const inputs=document.querySelectorAll("#questions input");
 
-for(let name in data.students){
+    let correct=0;
 
-html+=`<button onclick="startTest('${name}')">${name}</button>`;
+    inputs.forEach(input=>{
 
-}
+        const i=input.dataset.index;
 
-document.getElementById("studentsList").innerHTML=html;
+        if(input.value.trim().toLowerCase()===dictation[i].en){
 
-}
+            correct++;
 
-//////////////////////////////////////////////////
-// начать тест
-//////////////////////////////////////////////////
+        }
 
-function startTest(name){
+    });
 
-currentStudent=name;
+    const percent=Math.round(correct/dictation.length*100);
 
-words=data.students[name];
+    document.getElementById("result").innerText=
+    "Результат: "+percent+"%";
 
-answers=[];
-
-let html=`<h3>${name}</h3>`;
-
-html+=`<p>${data.instruction}</p>`;
-
-html+=`
-<p>
-Шкала оценок:<br>
-90–100% → 5<br>
-80–89% → 4<br>
-70–79% → 3<br>
-ниже 70% → 2
-</p>
-`;
-
-words.forEach((w,i)=>{
-
-answers[i]="";
-
-html+=`
-<div>
-${w.ru}
-<div
-class="secureInput"
-contenteditable="true"
-spellcheck="false"
-onpaste="return false"
-oncopy="return false"
-oncut="return false"
-oncontextmenu="return false"
-oninput="saveAnswer(${i}, this)"
-></div>
-</div>
-`;
-
-});
-
-html+=`<br>
-<button onclick="finishTest()">Отправить</button>
-<button onclick="startTest('${name}')">Начать новую попытку</button>
-`;
-
-document.getElementById("testArea").innerHTML=html;
-
-document.getElementById("resultArea").innerHTML="";
+    saveResult(percent);
 
 }
 
-//////////////////////////////////////////////////
-// сохранить ответ
-//////////////////////////////////////////////////
+// ===== СОХРАНЕНИЕ =====
 
-function saveAnswer(i, el){
+function saveResult(percent){
 
-answers[i]=el.innerText.trim();
+    let results=JSON.parse(localStorage.getItem("results"))||{};
 
-}
+    if(!results[currentStudent])
+        results[currentStudent]=[];
 
-//////////////////////////////////////////////////
-// завершить тест
-//////////////////////////////////////////////////
+    results[currentStudent].push({
+        date:new Date().toLocaleString(),
+        percent:percent
+    });
 
-function finishTest(){
-
-let correct=0;
-
-let details=[];
-
-words.forEach((w,i)=>{
-
-let ans=(answers[i]||"").trim();
-
-let ok=ans.toLowerCase()==w.en.toLowerCase();
-
-if(ok) correct++;
-
-details.push({
-ru:w.ru,
-correct:w.en,
-answer:ans,
-ok:ok
-});
-
-});
-
-let percent=Math.round(correct/words.length*100);
-
-let grade=2;
-
-if(percent>=90) grade=5;
-else if(percent>=80) grade=4;
-else if(percent>=70) grade=3;
-
-showResult(percent, grade, details);
-
-saveResult(percent, details);
+    localStorage.setItem("results",JSON.stringify(results));
 
 }
 
-//////////////////////////////////////////////////
-// показать результат
-//////////////////////////////////////////////////
+// ===== НОВАЯ ПОПЫТКА =====
 
-function showResult(percent, grade, details){
+function newAttempt(){
 
-let html=`<h2>Результат: ${percent}%</h2>`;
-html+=`<h2>Оценка: ${grade}</h2><hr>`;
+    loadQuestions();
 
-details.forEach(d=>{
-
-if(d.ok){
-
-html+=`<div class="correct">
-${d.ru} → ${d.answer} ✓
-</div>`;
-
-}
-else{
-
-html+=`<div class="wrong">
-${d.ru} → ${d.answer||"(пусто)"} ✗  
-Правильно: ${d.correct}
-</div>`;
+    document.getElementById("result").innerText="";
 
 }
 
-});
+// ===== ВХОД В TUTOR =====
 
-document.getElementById("resultArea").innerHTML=html;
+function enterTutor(){
 
-}
+    const pass=prompt("Пароль:");
 
-//////////////////////////////////////////////////
-// сохранить результат
-//////////////////////////////////////////////////
+    if(pass==="tutorai"){
 
-function saveResult(percent, details){
+        location.href="admin.html";
 
-if(!data.results[currentStudent])
-data.results[currentStudent]={attempts:[]};
+    }else{
 
-data.results[currentStudent].attempts.push({
+        alert("Неверный пароль");
 
-date:new Date().toLocaleString(),
-percent:percent,
-details:details
-
-});
-
-localStorage.setItem("dictationData",JSON.stringify(data));
+    }
 
 }
 
-//////////////////////////////////////////////////
-// вход tutor
-//////////////////////////////////////////////////
+// ===== СТАРТ =====
 
-function loginTutor(){
-
-let pass=prompt("Введите пароль");
-
-if(pass=="tutorai")
-window.location.href="tutor.html";
-
-else
-alert("Неверный пароль");
-
-}
-
-//////////////////////////////////////////////////
-
-loadData();
+loadStudents();
 
 </script>
 
