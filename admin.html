@@ -5,32 +5,11 @@
 <title>Админ панель</title>
 
 <style>
-body{
-  font-family:Arial;
-  padding:20px;
-}
-
-textarea{
-  width:100%;
-}
-
-.studentBlock{
-  border:1px solid #ccc;
-  padding:10px;
-  margin-bottom:20px;
-}
-
-.firstAttempt{
-  background:#f5f5f5;
-  padding:10px;
-  margin:10px 0;
-}
-
-.percent{
-  font-weight:bold;
-  margin:5px 0;
-}
-
+body{font-family:Arial;margin:20px;}
+button{margin:5px;padding:6px 12px;}
+textarea{width:100%;height:150px;}
+.studentBtn{display:block;margin:5px 0;}
+.resultBlock{background:#f5f5f5;padding:10px;margin:10px 0;}
 .correct{color:green;}
 .wrong{color:red;}
 </style>
@@ -38,53 +17,145 @@ textarea{
 </head>
 <body>
 
-<h2>Инструкция</h2>
-<textarea id="instruction" rows="4"></textarea>
-
-<h2>Диктанты учеников</h2>
-<p>
-Формат:<br>
-Имя ученика<br>
-русское:english<br>
----<br>
-Следующий ученик
-</p>
-
-<textarea id="students" rows="10"></textarea>
-<br><br>
-
-<button onclick="saveAll()">Сохранить</button>
+<h2>Ученики</h2>
+<div id="studentsList"></div>
+<button onclick="addStudent()">+ Добавить ученика</button>
 
 <hr>
-<h2>Результаты учеников</h2>
+
+<h2 id="editorTitle">Редактор</h2>
+<textarea id="words"></textarea>
+<br>
+<button onclick="saveStudent()">Сохранить ученика</button>
+
+<hr>
+
+<h2>Результаты</h2>
 <div id="results"></div>
 
 <script>
 
-const SETTINGS_BIN = "698f3a3043b1c97be97c510c";
-const API_KEY = "$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+const SETTINGS_BIN="698f3a3043b1c97be97c510c";
+const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-async function loadSettings(){
+let settings={};
+let currentStudent=null;
 
- let res = await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-  headers:{ "X-Master-Key":API_KEY }
+async function load(){
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{"X-Master-Key":API_KEY}
+ });
+ let data=await res.json();
+ settings=data.record;
+
+ if(!settings.students) settings.students={};
+ if(!settings.results) settings.results={};
+
+ renderStudents();
+ renderResults();
+}
+
+function renderStudents(){
+ let list=document.getElementById("studentsList");
+ list.innerHTML="";
+ for(let name in settings.students){
+   list.innerHTML+=`<button class="studentBtn" onclick="editStudent('${name}')">${name}</button>`;
+ }
+}
+
+function editStudent(name){
+ currentStudent=name;
+ document.getElementById("editorTitle").innerText="Редактор: "+name;
+
+ let text="";
+ settings.students[name].forEach(w=>{
+   text+=`${w.ru}:${w.en}\n`;
  });
 
- let data = await res.json();
- let record = data.record;
+ document.getElementById("words").value=text;
+}
 
- document.getElementById("instruction").value =
-   record.instruction || "";
+function addStudent(){
+ let name=prompt("Имя ученика:");
+ if(!name) return;
 
- let students = record.students || {};
- let text="";
+ settings.students[name]=[];
+ renderStudents();
+}
 
- for(let name in students){
-   text+=name+"\n";
-   students[name].forEach(w=>{
-     text+=`${w.ru}:${w.en}\n`;
+async function saveStudent(){
+ if(!currentStudent) return alert("Выберите ученика");
+
+ let lines=document.getElementById("words").value.split("\n");
+ let arr=[];
+
+ lines.forEach(l=>{
+   let parts=l.split(":");
+   if(parts.length==2){
+     arr.push({
+       ru:parts[0].trim(),
+       en:parts[1].trim()
+     });
+   }
+ });
+
+ settings.students[currentStudent]=arr;
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+   method:"PUT",
+   headers:{
+     "Content-Type":"application/json",
+     "X-Master-Key":API_KEY
+   },
+   body:JSON.stringify(settings)
+ });
+
+ alert("Сохранено");
+ renderResults();
+}
+
+function renderResults(){
+
+ let container=document.getElementById("results");
+ container.innerHTML="";
+
+ for(let name in settings.results){
+
+   container.innerHTML+=`<h3>${name}</h3>`;
+
+   let attempts=settings.results[name];
+
+   if(!Array.isArray(attempts)){
+     attempts=[attempts];
+   }
+
+   attempts.forEach((a,index)=>{
+
+     if(index==0){
+       container.innerHTML+=`<div class="resultBlock">
+         <b>Попытка 1 — ${a.percent}%</b><br>`;
+
+       a.details.forEach(d=>{
+         if(d.ok){
+           container.innerHTML+=`<div class="correct">${d.ru} → ${d.answer}</div>`;
+         }else{
+           container.innerHTML+=`<div class="wrong">${d.ru} → ${d.answer || "(пусто)"} (Правильно: ${d.correct})</div>`;
+         }
+       });
+
+       container.innerHTML+=`</div>`;
+     }else{
+       container.innerHTML+=`<div>Попытка ${index+1} — ${a.percent}%</div>`;
+     }
+
    });
-   text+="---\n";
  }
 
- document.getElementById("stu
+}
+
+load();
+
+</script>
+
+</body>
+</html>
