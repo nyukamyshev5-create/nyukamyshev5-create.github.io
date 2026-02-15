@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Диктанты</title>
+<title>Dictation System</title>
 
 <style>
 
@@ -16,15 +16,15 @@ text-align:center;
 
 .container{
 background:white;
-max-width:800px;
-margin:40px auto;
-padding:30px;
+max-width:900px;
+margin:30px auto;
+padding:25px;
 border-radius:15px;
 box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
 button{
-padding:10px 15px;
+padding:8px 15px;
 margin:5px;
 border:none;
 border-radius:8px;
@@ -33,7 +33,7 @@ background:#4e73df;
 color:white;
 }
 
-input{
+input, textarea{
 padding:8px;
 margin:5px;
 font-size:16px;
@@ -42,8 +42,10 @@ font-size:16px;
 .correct{color:green;}
 .wrong{color:red;}
 
-#test{display:none;}
-#adminPanel{display:none;}
+#test,#adminPanel,#adminLogin{
+display:none;
+text-align:left;
+}
 
 </style>
 </head>
@@ -51,26 +53,46 @@ font-size:16px;
 
 <div class="container">
 
-<h2>Выберите ученика</h2>
+<h2>Ученики</h2>
+
 <div id="studentsList"></div>
 
-<button onclick="showAdminLogin()">Админ</button>
+<hr>
 
-<div id="adminLogin" style="display:none;">
+<button onclick="showAdminLogin()">Tutor</button>
+
+<div id="adminLogin">
+
 <input type="password" id="adminPass" placeholder="Пароль">
+
 <button onclick="loginAdmin()">Войти</button>
+
 </div>
 
 <div id="adminPanel">
 
-<h3>Добавить ученика</h3>
+<h3>Добавить / редактировать ученика</h3>
 
-<input id="newStudentName" placeholder="Имя"><br>
+<input id="studentName" placeholder="Имя ученика">
 
-<textarea id="newStudentWords" rows="10" cols="40"
-placeholder="дом=house&#10;работа=work"></textarea><br>
+<br>
 
-<button onclick="addStudent()">Добавить</button>
+<textarea id="studentWords" rows="8" cols="50"
+placeholder="дом=house&#10;кот=cat"></textarea>
+
+<br>
+
+<button onclick="saveStudent()">Сохранить</button>
+
+<hr>
+
+<h3>Ученики</h3>
+
+<div id="adminStudents"></div>
+
+<hr>
+
+<div id="adminResults"></div>
 
 </div>
 
@@ -80,8 +102,9 @@ placeholder="дом=house&#10;работа=work"></textarea><br>
 
 <div id="words"></div>
 
-<button onclick="send()">Отправить</button>
-<button onclick="restart()">Начать новую попытку</button>
+<button onclick="finishTest()">Отправить</button>
+
+<button onclick="restartTest()">Начать новую попытку</button>
 
 <div id="result"></div>
 
@@ -91,111 +114,27 @@ placeholder="дом=house&#10;работа=work"></textarea><br>
 
 <script>
 
-const ADMIN_PASSWORD="tutorai";
+const ADMIN_PASS="tutorai";
 
-let students=JSON.parse(localStorage.getItem("studentsDB"))||{};
+let db=JSON.parse(localStorage.getItem("dictDB"));
+
+if(!db){
+
+db={
+students:{},
+results:{}
+};
+
+saveDB();
+
+}
+
 let currentStudent="";
-let words=[];
+let currentWords=[];
 
-updateStudents();
+function saveDB(){
 
-function updateStudents(){
-
-localStorage.setItem("studentsDB",JSON.stringify(students));
-
-let html="";
-
-for(let name in students){
-
-html+=`<button onclick="startTest('${name}')">${name}</button>`;
-
-}
-
-document.getElementById("studentsList").innerHTML=html;
-
-}
-
-function startTest(name){
-
-currentStudent=name;
-words=students[name];
-
-document.getElementById("studentTitle").innerText=name;
-
-let html="";
-
-words.forEach((w,i)=>{
-
-html+=`
-<div>
-
-${w[0]}
-
-<input
-
-id="w${i}"
-
-autocomplete="off"
-autocorrect="off"
-autocapitalize="off"
-spellcheck="false"
-
-onpaste="return false"
-ondrop="return false"
-
-oncontextmenu="return false"
-
-onkeydown="return blockKeys(event)"
-
->
-
-</div>
-`;
-
-});
-
-document.getElementById("words").innerHTML=html;
-
-document.getElementById("test").style.display="block";
-
-}
-
-function blockKeys(e){
-
-if(e.ctrlKey && (
-e.key==="v" ||
-e.key==="c" ||
-e.key==="x" ||
-e.key==="Insert"
-)) return false;
-
-return true;
-
-}
-
-function send(){
-
-let correct=0;
-
-words.forEach((w,i)=>{
-
-let val=document.getElementById("w"+i).value.trim();
-
-if(val.toLowerCase()===w[1].toLowerCase())
-correct++;
-
-});
-
-let percent=Math.round(correct/words.length*100);
-
-document.getElementById("result").innerHTML=
-"<h3>Результат: "+percent+"%</h3>";
-
-}
-
-function restart(){
-
-startTest(currentStudent);
+localStorage.setItem("dictDB",JSON.stringify(db));
 
 }
 
@@ -207,11 +146,11 @@ document.getElementById("adminLogin").style.display="block";
 
 function loginAdmin(){
 
-let pass=document.getElementById("adminPass").value;
-
-if(pass===ADMIN_PASSWORD){
+if(document.getElementById("adminPass").value===ADMIN_PASS){
 
 document.getElementById("adminPanel").style.display="block";
+
+renderAdminStudents();
 
 }else{
 
@@ -221,15 +160,57 @@ alert("Неверный пароль");
 
 }
 
-function addStudent(){
+function renderStudents(){
 
-let name=document.getElementById("newStudentName").value.trim();
+let html="";
 
-let raw=document.getElementById("newStudentWords").value.trim();
+for(let name in db.students){
+
+html+=`<button onclick="startTest('${name}')">${name}</button>`;
+
+}
+
+document.getElementById("studentsList").innerHTML=html;
+
+}
+
+function renderAdminStudents(){
+
+let html="";
+
+for(let name in db.students){
+
+html+=`
+
+<div>
+
+<b>${name}</b>
+
+<button onclick="editStudent('${name}')">Редактировать</button>
+
+<button onclick="deleteStudent('${name}')">Удалить</button>
+
+<button onclick="viewResults('${name}')">Результаты</button>
+
+</div>
+
+`;
+
+}
+
+document.getElementById("adminStudents").innerHTML=html;
+
+}
+
+function saveStudent(){
+
+let name=document.getElementById("studentName").value.trim();
+
+let raw=document.getElementById("studentWords").value.trim();
 
 if(!name||!raw){
 
-alert("Заполните поля");
+alert("Введите имя и слова");
 
 return;
 
@@ -237,7 +218,7 @@ return;
 
 let lines=raw.split("\n");
 
-students[name]=[];
+db.students[name]=[];
 
 lines.forEach(line=>{
 
@@ -245,20 +226,237 @@ let parts=line.split("=");
 
 if(parts.length===2){
 
-students[name].push([
-parts[0].trim(),
-parts[1].trim()
-]);
+db.students[name].push({
+
+ru:parts[0].trim(),
+en:parts[1].trim()
+
+});
 
 }
 
 });
 
-updateStudents();
+saveDB();
 
-alert("Ученик добавлен");
+renderStudents();
+
+renderAdminStudents();
+
+alert("Сохранено");
 
 }
+
+function editStudent(name){
+
+document.getElementById("studentName").value=name;
+
+let text="";
+
+db.students[name].forEach(w=>{
+
+text+=`${w.ru}=${w.en}\n`;
+
+});
+
+document.getElementById("studentWords").value=text;
+
+}
+
+function deleteStudent(name){
+
+if(!confirm("Удалить ученика?"))return;
+
+delete db.students[name];
+
+delete db.results[name];
+
+saveDB();
+
+renderStudents();
+
+renderAdminStudents();
+
+}
+
+function startTest(name){
+
+currentStudent=name;
+
+currentWords=db.students[name];
+
+document.getElementById("test").style.display="block";
+
+document.getElementById("studentTitle").innerText="Ученик: "+name;
+
+renderTestWords();
+
+}
+
+function renderTestWords(){
+
+let html="";
+
+currentWords.forEach((w,i)=>{
+
+html+=`
+
+<div>
+
+${w.ru}
+
+<input
+
+id="w${i}"
+
+autocomplete="off"
+spellcheck="false"
+
+onpaste="return false"
+oncopy="return false"
+
+>
+
+</div>
+
+`;
+
+});
+
+document.getElementById("words").innerHTML=html;
+
+document.getElementById("result").innerHTML="";
+
+}
+
+function finishTest(){
+
+let correct=0;
+
+let details=[];
+
+currentWords.forEach((w,i)=>{
+
+let val=document.getElementById("w"+i).value.trim();
+
+let ok=val.toLowerCase()===w.en.toLowerCase();
+
+if(ok)correct++;
+
+details.push({
+
+ru:w.ru,
+correct:w.en,
+answer:val,
+ok:ok
+
+});
+
+});
+
+let percent=Math.round(correct/currentWords.length*100);
+
+if(!db.results[currentStudent]){
+
+db.results[currentStudent]=[];
+
+}
+
+db.results[currentStudent].push({
+
+percent:percent,
+details:details,
+date:new Date().toLocaleString()
+
+});
+
+saveDB();
+
+showResult(percent,details);
+
+}
+
+function showResult(percent,details){
+
+let html=`<h3>Результат: ${percent}%</h3>`;
+
+details.forEach(d=>{
+
+if(d.ok){
+
+html+=`<div class="correct">${d.ru} → ${d.answer} ✓</div>`;
+
+}else{
+
+html+=`<div class="wrong">${d.ru} → ${d.answer||"(пусто)"} ✗ Правильно: ${d.correct}</div>`;
+
+}
+
+});
+
+document.getElementById("result").innerHTML=html;
+
+}
+
+function restartTest(){
+
+renderTestWords();
+
+}
+
+function viewResults(name){
+
+let attempts=db.results[name];
+
+if(!attempts){
+
+document.getElementById("adminResults").innerHTML="Нет попыток";
+
+return;
+
+}
+
+let html=`<h3>Результаты: ${name}</h3>`;
+
+attempts.forEach((a,i)=>{
+
+html+=`
+
+<hr>
+
+Попытка ${i+1}
+
+<br>
+
+${a.date}
+
+<br>
+
+${a.percent}%
+
+`;
+
+a.details.forEach(d=>{
+
+if(d.ok){
+
+html+=`<div class="correct">${d.ru} → ${d.answer}</div>`;
+
+}else{
+
+html+=`<div class="wrong">${d.ru} → ${d.answer} | ${d.correct}</div>`;
+
+}
+
+});
+
+});
+
+document.getElementById("adminResults").innerHTML=html;
+
+}
+
+renderStudents();
 
 </script>
 
