@@ -1,60 +1,325 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Tutor</title>
+<title>Диктант</title>
 
 <style>
+
 body{
-  font-family:Arial;
-  padding:30px;
-  background:#f4f6f9;
+font-family:Arial;
+background:linear-gradient(135deg,#4e73df,#1cc88a);
+margin:0;
+padding:20px;
 }
 
-.panel{
-  background:white;
-  padding:20px;
-  border-radius:12px;
-  max-width:900px;
-  margin:auto;
-  box-shadow:0 8px 25px rgba(0,0,0,0.1);
+.container{
+background:white;
+padding:25px;
+border-radius:12px;
+max-width:700px;
+margin:auto;
+box-shadow:0 0 20px rgba(0,0,0,0.2);
 }
 
 button{
-  padding:6px 10px;
-  margin:5px;
-  border:none;
-  border-radius:6px;
-  cursor:pointer;
-  background:#4e73df;
-  color:white;
+padding:10px 20px;
+margin:10px 5px;
+border:none;
+border-radius:8px;
+background:#4e73df;
+color:white;
+cursor:pointer;
+font-size:16px;
 }
 
 button:hover{
-  background:#2e59d9;
+background:#2e59d9;
 }
 
-textarea,input{
-  width:100%;
-  margin:5px 0;
-  padding:6px;
+input{
+padding:8px;
+margin:5px;
+width:300px;
+font-size:16px;
 }
 
-.hidden{display:none;}
+.correct{color:green;}
+.wrong{color:red;}
+
 </style>
 
 </head>
 <body>
 
-<div id="login" class="panel">
-<h2>Вход</h2>
-<input type="password" id="pass" placeholder="Введите пароль">
-<button onclick="check()">Войти</button>
+<div class="container">
+
+<h2 id="studentTitle"></h2>
+
+<div id="formArea"></div>
+
+<button onclick="submitTest()">Отправить</button>
+
+<button onclick="newAttempt()">Начать новую попытку</button>
+
+<button onclick="goHome()">На главную</button>
+
+<div id="resultArea"></div>
+
 </div>
 
-<div id="panel" class="panel hidden">
+<script>
 
-<h2>Инструкция</h2>
-<textarea id="instruction" rows="4"></textarea>
+//////////////////////////////////////////////////
+// ЗАЩИТА ОТ КОПИРОВАНИЯ И ВСТАВКИ
+//////////////////////////////////////////////////
 
-<h2>Созда
+document.addEventListener("copy", e=>e.preventDefault());
+
+document.addEventListener("paste", e=>e.preventDefault());
+
+document.addEventListener("cut", e=>e.preventDefault());
+
+document.addEventListener("contextmenu", e=>e.preventDefault());
+
+document.addEventListener("keydown", function(e){
+
+// Ctrl+C
+if(e.ctrlKey && e.key==="c") e.preventDefault();
+
+// Ctrl+V
+if(e.ctrlKey && e.key==="v") e.preventDefault();
+
+// Ctrl+X
+if(e.ctrlKey && e.key==="x") e.preventDefault();
+
+// Ctrl+U (просмотр кода)
+if(e.ctrlKey && e.key==="u") e.preventDefault();
+
+});
+
+//////////////////////////////////////////////////
+// ОТКЛЮЧЕНИЕ АВТОЗАПОЛНЕНИЯ
+//////////////////////////////////////////////////
+
+function disableAutocomplete(){
+
+document.querySelectorAll("input").forEach(input=>{
+
+input.value="";
+
+input.setAttribute("autocomplete","off");
+input.setAttribute("autocorrect","off");
+input.setAttribute("autocapitalize","off");
+input.setAttribute("spellcheck","false");
+
+});
+
+}
+
+//////////////////////////////////////////////////
+// ЗАГРУЗКА УЧЕНИКА
+//////////////////////////////////////////////////
+
+const student=localStorage.getItem("currentStudent");
+
+if(!student){
+
+location.href="index.html";
+
+}
+
+document.getElementById("studentTitle").innerText="Ученик: "+student;
+
+//////////////////////////////////////////////////
+// ЗАГРУЗКА СЛОВ
+//////////////////////////////////////////////////
+
+const dictants=JSON.parse(localStorage.getItem("dictants")||"{}");
+
+const words=dictants[student]||[];
+
+function renderForm(){
+
+let html="";
+
+words.forEach((w,i)=>{
+
+html+=`
+<div>
+
+<b>${w.ru}</b>
+
+<br>
+
+<input
+type="text"
+id="answer_${i}"
+name="answer_${i}_${Date.now()}_${Math.random()}"
+autocomplete="off"
+autocorrect="off"
+autocapitalize="off"
+spellcheck="false"
+
+>
+
+</div>
+`;
+
+});
+
+document.getElementById("formArea").innerHTML=html;
+
+disableAutocomplete();
+
+}
+
+renderForm();
+
+//////////////////////////////////////////////////
+// ПРОВЕРКА
+//////////////////////////////////////////////////
+
+function normalize(text){
+
+return text
+.toLowerCase()
+.replace(/[.,!?"]/g,"")
+.trim();
+
+}
+
+//////////////////////////////////////////////////
+// ОТПРАВКА
+//////////////////////////////////////////////////
+
+function submitTest(){
+
+let correct=0;
+
+let details=[];
+
+words.forEach((w,i)=>{
+
+const input=document.getElementById("answer_"+i);
+
+const user=normalize(input.value);
+
+const rightAnswers=w.en.split(",").map(a=>normalize(a));
+
+const isCorrect=rightAnswers.includes(user);
+
+if(isCorrect) correct++;
+
+details.push({
+
+ru:w.ru,
+user:user,
+correct:w.en,
+isCorrect:isCorrect
+
+});
+
+});
+
+const percent=Math.round(correct/words.length*100);
+
+saveResult(percent,details);
+
+showResult(percent,details);
+
+}
+
+//////////////////////////////////////////////////
+// СОХРАНЕНИЕ
+//////////////////////////////////////////////////
+
+function saveResult(percent,details){
+
+let results=JSON.parse(localStorage.getItem("results")||"{}");
+
+if(!results[student]) results[student]=[];
+
+results[student].push({
+
+date:new Date().toLocaleString(),
+percent:percent,
+details:details
+
+});
+
+localStorage.setItem("results",JSON.stringify(results));
+
+}
+
+//////////////////////////////////////////////////
+// ПОКАЗ
+//////////////////////////////////////////////////
+
+function showResult(percent,details){
+
+let html=`<h3>Результат: ${percent}%</h3>`;
+
+details.forEach(d=>{
+
+if(d.isCorrect){
+
+html+=`
+<div class="correct">
+${d.ru} → ${d.user} ✔
+</div>
+`;
+
+}else{
+
+html+=`
+<div class="wrong">
+${d.ru} → ${d.user || "(пусто)"} ❌
+(Правильно: ${d.correct})
+</div>
+`;
+
+}
+
+});
+
+document.getElementById("resultArea").innerHTML=html;
+
+}
+
+//////////////////////////////////////////////////
+// НОВАЯ ПОПЫТКА
+//////////////////////////////////////////////////
+
+function newAttempt(){
+
+document.getElementById("resultArea").innerHTML="";
+
+renderForm();
+
+window.scrollTo(0,0);
+
+}
+
+//////////////////////////////////////////////////
+// НА ГЛАВНУЮ
+//////////////////////////////////////////////////
+
+function goHome(){
+
+location.href="index.html";
+
+}
+
+//////////////////////////////////////////////////
+// ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА
+//////////////////////////////////////////////////
+
+setTimeout(disableAutocomplete,100);
+setTimeout(disableAutocomplete,500);
+setTimeout(disableAutocomplete,1000);
+
+</script>
+
+</body>
+</html>
