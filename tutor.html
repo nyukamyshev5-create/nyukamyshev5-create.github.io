@@ -2,25 +2,23 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Тест</title>
+<title>Админ</title>
 
 <style>
 
 body{
 font-family:Arial;
-background:#f0f0f0;
 padding:20px;
 }
 
-input{
-display:block;
-margin:10px;
-padding:5px;
+textarea{
+width:400px;
+height:200px;
 }
 
 button{
-padding:10px;
-margin:10px;
+margin:5px;
+padding:5px;
 }
 
 </style>
@@ -29,82 +27,115 @@ margin:10px;
 
 <body>
 
-<h2 id="name"></h2>
+<h2>Админка</h2>
 
-<div id="test"></div>
+<input id="name" placeholder="Имя ученика">
 
-<button onclick="finish()">Завершить</button>
+<button onclick="addStudent()">Добавить</button>
 
-<button onclick="retry()">Начать новую попытку</button>
+<hr>
 
-<div id="result"></div>
+<div id="students"></div>
 
 <script>
 
-document.addEventListener("copy",e=>e.preventDefault())
-document.addEventListener("paste",e=>e.preventDefault())
-
-const params=new URLSearchParams(location.search)
-const student=params.get("student")
-
-document.getElementById("name").innerText=student
-
-let words=[]
-let answers=[]
+let data={}
 
 fetch("data.json?"+Date.now())
 .then(r=>r.json())
-.then(data=>{
+.then(d=>{
 
-words=data.students[student].words
+data=d
+render()
 
-const test=document.getElementById("test")
+})
 
-words.forEach(w=>{
+function render(){
 
-test.innerHTML+=`
-<label>${w.ru}</label>
-<input>
+const div=document.getElementById("students")
+
+div.innerHTML=""
+
+for(const name in data.students){
+
+div.innerHTML+=`
+
+<hr>
+
+<h3>${name}</h3>
+
+<textarea id="words_${name}">${formatWords(name)}</textarea>
+
+<br>
+
+<button onclick="saveWords('${name}')">Сохранить слова</button>
+
+<button onclick="deleteStudent('${name}')">Удалить ученика</button>
+
 `
 
-})
-
-})
-
-function finish(){
-
-const inputs=document.querySelectorAll("input")
-
-let correct=0
-
-inputs.forEach((input,i)=>{
-
-answers.push(input.value)
-
-if(input.value.trim().toLowerCase()
-===words[i].en.toLowerCase())
-correct++
-
-})
-
-const percent=Math.round(correct/words.length*100)
-
-document.getElementById("result").innerHTML=
-"Результат: "+percent+"%"
-
-saveAttempt(percent,answers)
+}
 
 }
 
-function retry(){
+function formatWords(name){
 
-location.reload()
+return data.students[name].words
+.map(w=>`${w.ru} = ${w.en}`)
+.join("\n")
 
 }
 
-function saveAttempt(percent,answers){
+function saveWords(name){
 
-alert("Попытка сохранена (локально)")
+const text=
+document.getElementById("words_"+name).value
+
+const lines=text.split("\n")
+
+data.students[name].words=[]
+
+lines.forEach(line=>{
+
+if(line.includes("=")){
+
+const parts=line.split("=")
+
+data.students[name].words.push({
+
+ru:parts[0].trim(),
+en:parts[1].trim()
+
+})
+
+}
+
+})
+
+alert("Сохранено (локально)")
+
+}
+
+function addStudent(){
+
+const name=document.getElementById("name").value
+
+data.students[name]={
+
+words:[],
+attempts:[]
+
+}
+
+render()
+
+}
+
+function deleteStudent(name){
+
+delete data.students[name]
+
+render()
 
 }
 
