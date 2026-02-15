@@ -5,37 +5,55 @@
 <title>Диктанты</title>
 
 <style>
+
 body{
-  font-family:Arial;
-  background:linear-gradient(135deg,#4e73df,#1cc88a);
-  margin:0;
-  padding:0;
-  text-align:center;
+font-family:Arial;
+background:linear-gradient(135deg,#4e73df,#1cc88a);
+margin:0;
+padding:0;
+text-align:center;
 }
 
 .container{
-  background:white;
-  max-width:700px;
-  margin:40px auto;
-  padding:30px;
-  border-radius:15px;
-  box-shadow:0 10px 30px rgba(0,0,0,0.2);
+background:white;
+max-width:700px;
+margin:40px auto;
+padding:30px;
+border-radius:15px;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
 button{
-  padding:10px 15px;
-  margin:5px;
-  border:none;
-  border-radius:8px;
-  cursor:pointer;
-  background:#4e73df;
-  color:white;
+padding:10px 15px;
+margin:5px;
+border:none;
+border-radius:8px;
+cursor:pointer;
+background:#4e73df;
+color:white;
+font-size:15px;
+}
+
+button:hover{
+background:#2e59d9;
 }
 
 .correct{color:green;}
 .wrong{color:red;}
 
 #test{display:none;}
+
+.secureInput{
+display:inline-block;
+min-width:220px;
+padding:6px;
+margin:3px;
+border:1px solid #ccc;
+border-radius:6px;
+font-size:16px;
+background:white;
+}
+
 </style>
 </head>
 <body>
@@ -43,30 +61,43 @@ button{
 <div class="container">
 
 <h2>Выберите ученика</h2>
-<div id="studentsList"></div>
+
+<div id="studentsList">
+Загрузка...
+</div>
 
 <hr>
+
 <button onclick="goTutor()">Tutor</button>
 
 <div id="test">
+
 <hr>
+
 <h3 id="studentTitle"></h3>
+
 <p id="instruction"></p>
 
 <div>
+
 <b>Шкала оценок:</b><br>
 90–100% → 5<br>
 80–89% → 4<br>
 70–79% → 3<br>
 ниже 70% → 2
+
 </div>
 
 <hr>
+
 <div id="words"></div>
 
 <button onclick="send()">Отправить</button>
 
+<button onclick="newAttempt()">Начать новую попытку</button>
+
 <div id="result"></div>
+
 </div>
 
 </div>
@@ -78,129 +109,8 @@ const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
 let words=[];
 let currentStudent="";
+let answers=[];
 
-async function loadStudents(){
- let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{"X-Master-Key":API_KEY}
- });
- let data=await res.json();
- let students=data.record.students||{};
- let html="";
- for(let name in students){
-   html+=`<button onclick="startTest('${name}')">${name}</button>`;
- }
- document.getElementById("studentsList").innerHTML=html;
-}
-
-async function startTest(name){
- currentStudent=name;
-
- let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{"X-Master-Key":API_KEY}
- });
- let data=await res.json();
-
- words=data.record.students[name];
-
- document.getElementById("studentTitle").innerText="Ученик: "+name;
- document.getElementById("instruction").innerText=data.record.instruction||"";
-
- let html="";
- words.forEach((w,i)=>{
-   html+=`${w.ru}<input id="w${i}"><br>`;
- });
-
- document.getElementById("words").innerHTML=html;
- document.getElementById("test").style.display="block";
- document.getElementById("result").innerHTML="";
-}
-
-async function send(){
-
- let correct=0;
- let details=[];
-
- words.forEach((w,i)=>{
-
-   let val=document.getElementById("w"+i).value.trim();
-   let isCorrect=val.toLowerCase()===w.en.toLowerCase();
-
-   if(isCorrect) correct++;
-
-   details.push({
-     ru:w.ru,
-     correct:w.en,
-     answer:val,
-     ok:isCorrect
-   });
-
- });
-
- let percent=Math.round((correct/words.length)*100);
-
- let grade=2;
- if(percent>=90) grade=5;
- else if(percent>=80) grade=4;
- else if(percent>=70) grade=3;
-
- let html=`<h2>Результат: ${percent}%</h2>
-           <h2>Оценка: ${grade}</h2><hr>`;
-
- details.forEach(d=>{
-   if(d.ok){
-     html+=`<p class="correct">${d.ru} → ${d.answer} ✅</p>`;
-   }else{
-     html+=`<p class="wrong">${d.ru} → ${d.answer||"(пусто)"} — Ошибка ❌ (Правильно: ${d.correct})</p>`;
-   }
- });
-
- document.getElementById("result").innerHTML=html;
-
- saveResult(percent, details);
-}
-
-async function saveResult(percent, details){
-
- let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{"X-Master-Key":API_KEY}
- });
-
- let data=await res.json();
- let settings=data.record;
-
- if(!settings.results) settings.results={};
-
- if(!settings.results[currentStudent]){
-   settings.results[currentStudent]=[];
- }
-
- if(!Array.isArray(settings.results[currentStudent])){
-   settings.results[currentStudent]=[settings.results[currentStudent]];
- }
-
- settings.results[currentStudent].push({
-   percent:percent,
-   details:details,
-   date:new Date().toLocaleString()
- });
-
- await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-   method:"PUT",
-   headers:{
-     "Content-Type":"application/json",
-     "X-Master-Key":API_KEY
-   },
-   body:JSON.stringify(settings)
- });
-
-}
-
-function goTutor(){
-  window.location.href = "admin.html";
-}
-
-loadStudents();
-
-</script>
-</body>
-</html>
+//////////////////////////////////////////////////////
+// НАДЕЖНАЯ ЗАГРУЗКА БЕЗ VPN
+///
