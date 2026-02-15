@@ -2,140 +2,169 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Админ</title>
-
-<style>
-
-body{
-font-family:Arial;
-padding:20px;
-}
-
-textarea{
-width:400px;
-height:200px;
-}
-
-button{
-margin:5px;
-padding:5px;
-}
-
-</style>
-
+<title>Диктант</title>
 </head>
 
 <body>
 
-<h2>Админка</h2>
+<h2 id="studentName"></h2>
 
-<input id="name" placeholder="Имя ученика">
+<div id="test"></div>
 
-<button onclick="addStudent()">Добавить</button>
+<button onclick="check()">Проверить</button>
 
-<hr>
+<button onclick="restart()">Пройти заново</button>
 
-<div id="students"></div>
+<div id="result"></div>
 
 <script>
 
-let data={}
+const TOKEN="PASTE_NEW_TOKEN_HERE"
+const USER="nyukamyshev5"
+const REPO="nyukamyshev5-create"
 
-fetch("data.json?"+Date.now())
-.then(r=>r.json())
-.then(d=>{
+let student=
+localStorage.getItem("student")
 
-data=d
+let words=[]
+
+let sha=""
+
+document.getElementById("studentName")
+.innerText=student
+
+load()
+
+async function load(){
+
+const res=await fetch(
+`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`
+)
+
+const json=await res.json()
+
+sha=json.sha
+
+const data=JSON.parse(atob(json.content))
+
+words=data.students[student].words
+
 render()
 
-})
+}
 
 function render(){
 
-const div=document.getElementById("students")
+const div=document.getElementById("test")
 
 div.innerHTML=""
 
-for(const name in data.students){
+words.forEach((w,i)=>{
 
 div.innerHTML+=`
 
-<hr>
+<div>
 
-<h3>${name}</h3>
-
-<textarea id="words_${name}">${formatWords(name)}</textarea>
+${w.ru}
 
 <br>
 
-<button onclick="saveWords('${name}')">Сохранить слова</button>
+<input id="input${i}">
 
-<button onclick="deleteStudent('${name}')">Удалить ученика</button>
+</div>
+
+<br>
 
 `
 
-}
-
-}
-
-function formatWords(name){
-
-return data.students[name].words
-.map(w=>`${w.ru} = ${w.en}`)
-.join("\n")
-
-}
-
-function saveWords(name){
-
-const text=
-document.getElementById("words_"+name).value
-
-const lines=text.split("\n")
-
-data.students[name].words=[]
-
-lines.forEach(line=>{
-
-if(line.includes("=")){
-
-const parts=line.split("=")
-
-data.students[name].words.push({
-
-ru:parts[0].trim(),
-en:parts[1].trim()
-
 })
 
 }
 
+async function check(){
+
+let correct=0
+
+let answers=[]
+
+words.forEach((w,i)=>{
+
+const val=
+document.getElementById("input"+i).value.trim()
+
+answers.push(val)
+
+if(val.toLowerCase()==w.en.toLowerCase())
+correct++
+
 })
 
-alert("Сохранено (локально)")
+const percent=
+Math.round(correct/words.length*100)
+
+document.getElementById("result")
+.innerHTML="Результат: "+percent+"%"
+
+await saveAttempt(percent,answers)
 
 }
 
-function addStudent(){
-
-const name=document.getElementById("name").value
-
-data.students[name]={
-
-words:[],
-attempts:[]
-
-}
+function restart(){
 
 render()
 
+document.getElementById("result").innerHTML=""
+
 }
 
-function deleteStudent(name){
+async function saveAttempt(percent,answers){
 
-delete data.students[name]
+const res=await fetch(
+`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`
+)
 
-render()
+const json=await res.json()
+
+let data=JSON.parse(atob(json.content))
+
+if(!data.students[student].attempts)
+data.students[student].attempts=[]
+
+data.students[student].attempts.push({
+
+date:new Date().toLocaleString(),
+
+percent:percent,
+
+answers:answers
+
+})
+
+const content=btoa(
+JSON.stringify(data,null,2)
+)
+
+await fetch(
+`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`,
+{
+method:"PUT",
+
+headers:{
+Authorization:`Bearer ${TOKEN}`
+},
+
+body:JSON.stringify({
+
+message:"save attempt",
+
+content:content,
+
+sha:json.sha
+
+})
+
+}
+)
 
 }
 
