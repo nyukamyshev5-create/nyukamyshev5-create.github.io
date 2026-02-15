@@ -1,28 +1,39 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Ученики</title>
+<title>Тест</title>
+
+<script src="config.js"></script>
+
 <style>
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#4facfe,#43e97b);
-margin:0;
+color:white;
+text-align:center;
 padding:20px;
 }
 
 .box{
 background:white;
+color:black;
 padding:20px;
 border-radius:10px;
-max-width:500px;
-margin:auto;
+display:inline-block;
+}
+
+input{
+font-size:18px;
+padding:5px;
+margin:5px;
+width:300px;
 }
 
 button{
+font-size:18px;
 padding:10px;
-margin:5px;
-cursor:pointer;
+margin:10px;
 }
 </style>
 </head>
@@ -30,104 +41,99 @@ cursor:pointer;
 
 <div class="box">
 
-<h2>Ученики</h2>
+<h2>Введите имя</h2>
 
-<div id="students"></div>
+<input id="name">
 
 <br>
 
-<input id="newStudent" placeholder="Имя ученика">
-<button onclick="addStudent()">Добавить</button>
+<button onclick="start()">Начать</button>
 
-<br><br>
-
-<button onclick="location.href='admin.html'">Админка</button>
+<div id="test"></div>
 
 </div>
 
 <script>
 
-const USER="nyukamyshev5-create";
-const REPO="nyukamyshev5-create.github.io";
-const FILE="data.json";
+let studentName="";
+let words=[];
 
-async function load(){
+function blockStudentProtection(){
 
-const res=await fetch(FILE+"?"+Date.now());
-const data=await res.json();
+document.addEventListener("copy", e=>e.preventDefault());
+document.addEventListener("paste", e=>e.preventDefault());
 
-const div=document.getElementById("students");
-div.innerHTML="";
+document.addEventListener("keydown", function(e){
 
-for(const name in data.students){
-
-const btn=document.createElement("button");
-btn.innerText=name;
-
-btn.onclick=()=>{
-localStorage.setItem("student",name);
-location.href="tutor.html";
-};
-
-div.appendChild(btn);
-
-}
-
-}
-
-async function addStudent(){
-
-const name=document.getElementById("newStudent").value.trim();
-
-if(!name)return;
-
-const res=await fetch(FILE+"?"+Date.now());
-const data=await res.json();
-
-if(!data.students[name]){
-
-data.students[name]={words:[],attempts:[]};
-
-await save(data);
-
-}
-
-load();
-
-}
-
-async function save(data){
-
-const token=prompt("Введите GitHub token");
-
-const get=await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`);
-
-const json=await get.json();
-
-await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`,{
-
-method:"PUT",
-
-headers:{
-Authorization:"Bearer "+token,
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-
-message:"update",
-
-content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
-
-sha:json.sha
-
-})
+if(e.ctrlKey && (e.key==="v"||e.key==="c"))
+e.preventDefault();
 
 });
 
 }
 
-load();
+blockStudentProtection();
+
+async function loadData(){
+
+const res=await fetch("data.json?"+Date.now());
+
+return await res.json();
+
+}
+
+async function start(){
+
+studentName=document.getElementById("name").value.trim();
+
+if(!studentName)return;
+
+const data=await loadData();
+
+if(!data.students[studentName]){
+
+alert("Ученика нет");
+
+return;
+
+}
+
+words=data.students[studentName].words;
+
+showTest();
+
+}
+
+function showTest(){
+
+let html="<h3>"+studentName+"</h3>";
+
+words.forEach((w,i)=>{
+
+html+=w.ru+"<br>";
+html+=`<input id="a${i}"><br><br>`;
+
+});
+
+html+=`<button onclick="save()">Отправить</button>`;
+
+html+=`<button onclick="retry()">Начать новую попытку</button>`;
+
+document.getElementById("test").innerHTML=html;
+
+}
+
+function retry(){
+
+showTest();
+
+}
+
+function save(){
+
+alert("Ответы сохранены (визуально)");
+
+}
 
 </script>
 
