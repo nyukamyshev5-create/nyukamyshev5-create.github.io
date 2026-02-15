@@ -6,13 +6,11 @@
 
 <meta name="autocomplete" content="off">
 <meta name="autofill" content="off">
-<meta name="format-detection" content="telephone=no">
-<meta http-equiv="Cache-Control" content="no-store">
 
 <style>
 body{
     font-family: Arial;
-    background: linear-gradient(135deg,#4e73df,#1cc88a);
+    background: linear-gradient(90deg,#4e73df,#1cc88a);
     margin:0;
 }
 
@@ -21,15 +19,14 @@ body{
     width:700px;
     margin:40px auto;
     padding:30px;
-    border-radius:15px;
-    text-align:center;
+    border-radius:10px;
 }
 
 button{
     padding:10px 20px;
     margin:5px;
     border:none;
-    border-radius:8px;
+    border-radius:6px;
     background:#4e73df;
     color:white;
     cursor:pointer;
@@ -40,18 +37,22 @@ button:hover{
 }
 
 input{
-    padding:8px;
+    padding:5px;
     margin:5px;
-    width:250px;
 }
 
 .hidden{
     display:none;
 }
+
+.result{
+    margin-top:20px;
+    padding:10px;
+    background:#f8f9fc;
+}
 </style>
 </head>
-
-<body oncopy="return false" onpaste="return false" oncut="return false">
+<body>
 
 <div class="container">
 
@@ -61,23 +62,17 @@ input{
 
 <hr>
 
-<button onclick="enterTutor()">Tutor</button>
-
-<div id="testBlock" class="hidden">
+<div id="testArea" class="hidden">
 
 <h3 id="studentName"></h3>
 
-<p>Переведи:</p>
-
-<div id="questions"></div>
+<div id="words"></div>
 
 <button onclick="submitTest()">Отправить</button>
 
-<br><br>
+<button onclick="restart()">Начать новую попытку</button>
 
-<button onclick="newAttempt()">Пройти тест заново</button>
-
-<p id="result"></p>
+<div id="result"></div>
 
 </div>
 
@@ -85,203 +80,218 @@ input{
 
 <script>
 
-// ===== ЗАЩИТА =====
+//////////////////////////////////////////////////
+// СЛОВА УЧЕНИКОВ (ХРАНЯТСЯ НАВСЕГДА)
+//////////////////////////////////////////////////
 
-// блок вставки
-document.addEventListener("paste", e => e.preventDefault());
+const students = {
 
-// блок ctrl+v
-document.addEventListener("keydown", e=>{
-    if(e.ctrlKey && e.key==="v") e.preventDefault();
+"Полина":[
+["исследование","research"],
+["карьера","career"],
+["гид","guide"],
+["развитие","development"]
+],
+
+"Ирина":[
+["пухлый, полненький","chubby"],
+["болтун, болтушка","chatterbox"],
+["злодей, негодяй","villain"],
+["огромный, массивный","huge"]
+],
+
+"Кира":[
+["дом","house"],
+["работа","work"],
+["исследование","research"]
+],
+
+"Алексей":[
+["быстрый","fast"],
+["медленный","slow"]
+],
+
+"Григорий":[
+["умный","smart"],
+["глупый","stupid"]
+],
+
+"Роман":[
+["сильный","strong"],
+["слабый","weak"]
+],
+
+"Владимир":[
+["большой","big"],
+["маленький","small"]
+],
+
+"Дарья":[
+["красивый","beautiful"],
+["уродливый","ugly"]
+],
+
+"Ксения":[
+["новый","new"],
+["старый","old"]
+],
+
+"Виктория":[
+["запрет","ban"],
+["юмор","humor"],
+["следствие","consequence"]
+]
+
+};
+
+//////////////////////////////////////////////////
+// защита от автозаполнения
+//////////////////////////////////////////////////
+
+document.addEventListener("input", e=>{
+e.target.setAttribute("autocomplete","off");
+e.target.setAttribute("readonly",true);
+setTimeout(()=>e.target.removeAttribute("readonly"),50);
 });
 
-// отключение autocomplete полностью
-document.addEventListener("focusin", e=>{
-    if(e.target.tagName==="INPUT"){
-        e.target.setAttribute("autocomplete","new-password");
-        e.target.setAttribute("readonly",true);
-        setTimeout(()=>e.target.removeAttribute("readonly"),100);
-    }
+//////////////////////////////////////////////////
+// защита от вставки
+//////////////////////////////////////////////////
+
+document.addEventListener("paste", e=>{
+e.preventDefault();
+alert("Вставка запрещена");
 });
 
-// ===== УЧЕНИКИ ПО УМОЛЧАНИЮ =====
+//////////////////////////////////////////////////
+// защита от копирования
+//////////////////////////////////////////////////
 
-const defaultStudents = [
-"Полина",
-"Ирина",
-"Кира",
-"Алексей",
-"Григорий",
-"Роман",
-"Владимир",
-"Дарья",
-"Ксения",
-"Виктория"
-];
+document.addEventListener("copy", e=>{
+e.preventDefault();
+});
 
-// восстановление если пропали
-if(!localStorage.getItem("students")){
-    localStorage.setItem("students",JSON.stringify(defaultStudents));
-}
+document.addEventListener("contextmenu", e=>{
+e.preventDefault();
+});
 
-// ===== ВОПРОСЫ =====
+//////////////////////////////////////////////////
+// создание кнопок учеников
+//////////////////////////////////////////////////
 
-const dictation = [
-{ru:"запрет",en:"ban"},
-{ru:"юмор",en:"humor"},
-{ru:"следствие",en:"consequence"},
-{ru:"как следствие",en:"as a consequence"}
-];
+const studentsDiv=document.getElementById("students");
 
-// ===== ЗАГРУЗКА УЧЕНИКОВ =====
+Object.keys(students).forEach(name=>{
 
-function loadStudents(){
+const btn=document.createElement("button");
 
-    const container=document.getElementById("students");
+btn.innerText=name;
 
-    const students=JSON.parse(localStorage.getItem("students"));
+btn.onclick=()=>startTest(name);
 
-    container.innerHTML="";
+studentsDiv.appendChild(btn);
 
-    students.forEach(name=>{
+});
 
-        const btn=document.createElement("button");
-
-        btn.textContent=name;
-
-        btn.onclick=()=>selectStudent(name);
-
-        container.appendChild(btn);
-
-    });
-
-}
-
-// ===== ВЫБОР УЧЕНИКА =====
+//////////////////////////////////////////////////
+// запуск теста
+//////////////////////////////////////////////////
 
 let currentStudent="";
+let inputs=[];
 
-function selectStudent(name){
+function startTest(name){
 
-    currentStudent=name;
+currentStudent=name;
 
-    document.getElementById("studentName").innerText="Ученик: "+name;
+document.getElementById("studentName").innerText="Ученик: "+name;
 
-    document.getElementById("testBlock").classList.remove("hidden");
+const wordsDiv=document.getElementById("words");
 
-    loadQuestions();
+wordsDiv.innerHTML="";
 
-}
+inputs=[];
 
-// ===== ЗАГРУЗКА ВОПРОСОВ =====
+students[name].forEach((word,index)=>{
 
-function loadQuestions(){
+const div=document.createElement("div");
 
-    const container=document.getElementById("questions");
+div.innerHTML=word[0]+" <input type='text' autocomplete='off'>";
 
-    container.innerHTML="";
+wordsDiv.appendChild(div);
 
-    dictation.forEach((q,i)=>{
+inputs.push(div.querySelector("input"));
 
-        const div=document.createElement("div");
+});
 
-        div.innerHTML=`
-        ${q.ru}<br>
-        <input 
-            type="text"
-            autocomplete="off"
-            autocorrect="off"
-            autocapitalize="off"
-            spellcheck="false"
-            name="q${Math.random()}"
-            data-index="${i}"
-        ><br><br>
-        `;
+document.getElementById("testArea").classList.remove("hidden");
 
-        container.appendChild(div);
-
-    });
+document.getElementById("result").innerHTML="";
 
 }
 
-// ===== ПРОВЕРКА =====
+//////////////////////////////////////////////////
+// проверка
+//////////////////////////////////////////////////
+
+function normalize(text){
+
+return text
+.toLowerCase()
+.replace(/[^a-z\s]/g,"")
+.trim();
+
+}
 
 function submitTest(){
 
-    const inputs=document.querySelectorAll("#questions input");
+let correct=0;
 
-    let correct=0;
+let total=students[currentStudent].length;
 
-    inputs.forEach(input=>{
+let details="";
 
-        const i=input.dataset.index;
+students[currentStudent].forEach((word,index)=>{
 
-        if(input.value.trim().toLowerCase()===dictation[i].en){
+const answer=normalize(inputs[index].value);
 
-            correct++;
+const correctAnswer=normalize(word[1]);
 
-        }
+if(answer===correctAnswer){
 
-    });
+correct++;
 
-    const percent=Math.round(correct/dictation.length*100);
+details+="✅ "+word[0]+"<br>";
 
-    document.getElementById("result").innerText=
-    "Результат: "+percent+"%";
+}else{
 
-    saveResult(percent);
-
-}
-
-// ===== СОХРАНЕНИЕ =====
-
-function saveResult(percent){
-
-    let results=JSON.parse(localStorage.getItem("results"))||{};
-
-    if(!results[currentStudent])
-        results[currentStudent]=[];
-
-    results[currentStudent].push({
-        date:new Date().toLocaleString(),
-        percent:percent
-    });
-
-    localStorage.setItem("results",JSON.stringify(results));
+details+="❌ "+word[0]+" → "+word[1]+"<br>";
 
 }
 
-// ===== НОВАЯ ПОПЫТКА =====
+});
 
-function newAttempt(){
+let percent=Math.round(correct/total*100);
 
-    loadQuestions();
-
-    document.getElementById("result").innerText="";
-
-}
-
-// ===== ВХОД В TUTOR =====
-
-function enterTutor(){
-
-    const pass=prompt("Пароль:");
-
-    if(pass==="tutorai"){
-
-        location.href="admin.html";
-
-    }else{
-
-        alert("Неверный пароль");
-
-    }
+document.getElementById("result").innerHTML=
+"<div class='result'>"+
+"Процент: "+percent+"%<br><br>"+
+details+
+"</div>";
 
 }
 
-// ===== СТАРТ =====
+//////////////////////////////////////////////////
+// новая попытка
+//////////////////////////////////////////////////
 
-loadStudents();
+function restart(){
+
+inputs.forEach(input=>input.value="");
+
+document.getElementById("result").innerHTML="";
+
+}
 
 </script>
 
