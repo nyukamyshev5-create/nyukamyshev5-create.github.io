@@ -4,7 +4,7 @@ const CONFIG = {
   file: "data.json",
   branch: "main",
 
-  token: "В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",
+  token: "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",
 
   adminPassword: "tutorai"
 };
