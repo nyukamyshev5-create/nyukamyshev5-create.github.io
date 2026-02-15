@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Диктант</title>
+<title>Dictation</title>
 
 <style>
 
@@ -10,314 +10,256 @@ body{
 font-family:Arial;
 background:linear-gradient(135deg,#4e73df,#1cc88a);
 margin:0;
-padding:20px;
+padding:0;
 }
 
-.container{
+.card{
 background:white;
-padding:25px;
-border-radius:12px;
-max-width:700px;
-margin:auto;
-box-shadow:0 0 20px rgba(0,0,0,0.2);
+max-width:800px;
+margin:40px auto;
+padding:30px;
+border-radius:15px;
+text-align:center;
 }
 
 button{
-padding:10px 20px;
-margin:10px 5px;
-border:none;
-border-radius:8px;
 background:#4e73df;
 color:white;
+border:none;
+padding:10px 20px;
+border-radius:8px;
 cursor:pointer;
-font-size:16px;
+margin:5px;
 }
 
 button:hover{
 background:#2e59d9;
 }
 
-input{
-padding:8px;
-margin:5px;
-width:300px;
-font-size:16px;
+.word{
+margin:10px;
+font-size:18px;
 }
 
-.correct{color:green;}
-.wrong{color:red;}
+.secureInput{
+
+display:inline-block;
+min-width:200px;
+min-height:28px;
+border:2px solid #ccc;
+border-radius:6px;
+padding:4px;
+margin-left:10px;
+background:white;
+
+}
+
+.secureInput:focus{
+outline:none;
+border-color:#4e73df;
+}
 
 </style>
 
 </head>
 <body>
 
-<div class="container">
+<div class="card">
 
-<h2 id="studentTitle"></h2>
+<h2>Выберите ученика</h2>
 
-<div id="formArea"></div>
+<div id="students"></div>
 
-<button onclick="submitTest()">Отправить</button>
+<hr>
 
-<button onclick="newAttempt()">Начать новую попытку</button>
+<button onclick="location.href='index.html'">Назад</button>
 
-<button onclick="goHome()">На главную</button>
-
-<div id="resultArea"></div>
+<div id="dictation"></div>
 
 </div>
 
 <script>
 
-//////////////////////////////////////////////////
-// ЗАЩИТА ОТ КОПИРОВАНИЯ И ВСТАВКИ
-//////////////////////////////////////////////////
+const SETTINGS_BIN="698f3a3043b1c97be97c510c";
+const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-document.addEventListener("copy", e=>e.preventDefault());
+let currentStudent="";
+let words=[];
+let answers=[];
 
-document.addEventListener("paste", e=>e.preventDefault());
+loadStudents();
 
-document.addEventListener("cut", e=>e.preventDefault());
+async function loadStudents(){
 
-document.addEventListener("contextmenu", e=>e.preventDefault());
-
-document.addEventListener("keydown", function(e){
-
-// Ctrl+C
-if(e.ctrlKey && e.key==="c") e.preventDefault();
-
-// Ctrl+V
-if(e.ctrlKey && e.key==="v") e.preventDefault();
-
-// Ctrl+X
-if(e.ctrlKey && e.key==="x") e.preventDefault();
-
-// Ctrl+U (просмотр кода)
-if(e.ctrlKey && e.key==="u") e.preventDefault();
-
+let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+headers:{"X-Master-Key":API_KEY}
 });
 
-//////////////////////////////////////////////////
-// ОТКЛЮЧЕНИЕ АВТОЗАПОЛНЕНИЯ
-//////////////////////////////////////////////////
+let data=await res.json();
 
-function disableAutocomplete(){
+let students=data.record.students;
 
-document.querySelectorAll("input").forEach(input=>{
+let div=document.getElementById("students");
 
-input.value="";
+div.innerHTML="";
 
-input.setAttribute("autocomplete","off");
-input.setAttribute("autocorrect","off");
-input.setAttribute("autocapitalize","off");
-input.setAttribute("spellcheck","false");
+for(let name in students){
 
-});
+let btn=document.createElement("button");
+
+btn.innerText=name;
+
+btn.onclick=()=>startDictation(name,students[name]);
+
+div.appendChild(btn);
 
 }
 
-//////////////////////////////////////////////////
-// ЗАГРУЗКА УЧЕНИКА
-//////////////////////////////////////////////////
-
-const student=localStorage.getItem("currentStudent");
-
-if(!student){
-
-location.href="index.html";
-
 }
 
-document.getElementById("studentTitle").innerText="Ученик: "+student;
+function startDictation(name,data){
 
-//////////////////////////////////////////////////
-// ЗАГРУЗКА СЛОВ
-//////////////////////////////////////////////////
+currentStudent=name;
 
-const dictants=JSON.parse(localStorage.getItem("dictants")||"{}");
+words=data;
 
-const words=dictants[student]||[];
+answers=new Array(words.length).fill("");
 
-function renderForm(){
-
-let html="";
+let html=`<h3>Ученик: ${name}</h3>`;
 
 words.forEach((w,i)=>{
 
 html+=`
-<div>
+<div class="word">
 
-<b>${w.ru}</b>
+${w.ru}
 
-<br>
-
-<input
-type="text"
-id="answer_${i}"
-name="answer_${i}_${Date.now()}_${Math.random()}"
-autocomplete="off"
-autocorrect="off"
-autocapitalize="off"
-spellcheck="false"
-
->
+<div
+class="secureInput"
+contenteditable="true"
+id="input_${i}"
+onpaste="return false"
+oncopy="return false"
+oncut="return false"
+ondrop="return false"
+oncontextmenu="return false"
+onkeydown="protectKey(event)"
+oninput="saveAnswer(${i})"
+></div>
 
 </div>
 `;
 
 });
 
-document.getElementById("formArea").innerHTML=html;
+html+=`<button onclick="submit()">Отправить</button>`;
 
-disableAutocomplete();
+html+=`<button onclick="newAttempt()">Начать новую попытку</button>`;
 
-}
+html+=`<div id="result"></div>`;
 
-renderForm();
-
-//////////////////////////////////////////////////
-// ПРОВЕРКА
-//////////////////////////////////////////////////
-
-function normalize(text){
-
-return text
-.toLowerCase()
-.replace(/[.,!?"]/g,"")
-.trim();
+document.getElementById("dictation").innerHTML=html;
 
 }
 
-//////////////////////////////////////////////////
-// ОТПРАВКА
-//////////////////////////////////////////////////
+function saveAnswer(i){
 
-function submitTest(){
+let text=document.getElementById("input_"+i).innerText;
+
+answers[i]=text.trim().toLowerCase();
+
+}
+
+function protectKey(e){
+
+if(e.ctrlKey) e.preventDefault();
+
+}
+
+async function submit(){
 
 let correct=0;
 
-let details=[];
+let detail="";
 
 words.forEach((w,i)=>{
 
-const input=document.getElementById("answer_"+i);
+let ok=answers[i]==w.en.toLowerCase();
 
-const user=normalize(input.value);
+if(ok) correct++;
 
-const rightAnswers=w.en.split(",").map(a=>normalize(a));
-
-const isCorrect=rightAnswers.includes(user);
-
-if(isCorrect) correct++;
-
-details.push({
-
-ru:w.ru,
-user:user,
-correct:w.en,
-isCorrect:isCorrect
+detail+=`${w.ru} → ${answers[i]} ${ok?"✓":"✗ ("+w.en+")"}<br>`;
 
 });
 
-});
+let percent=Math.round(correct/words.length*100);
 
-const percent=Math.round(correct/words.length*100);
+document.getElementById("result").innerHTML=
+`<h3>${percent}%</h3>${detail}`;
 
-saveResult(percent,details);
-
-showResult(percent,details);
-
-}
-
-//////////////////////////////////////////////////
-// СОХРАНЕНИЕ
-//////////////////////////////////////////////////
-
-function saveResult(percent,details){
-
-let results=JSON.parse(localStorage.getItem("results")||"{}");
-
-if(!results[student]) results[student]=[];
-
-results[student].push({
-
-date:new Date().toLocaleString(),
-percent:percent,
-details:details
-
-});
-
-localStorage.setItem("results",JSON.stringify(results));
+saveResult(percent,detail);
 
 }
-
-//////////////////////////////////////////////////
-// ПОКАЗ
-//////////////////////////////////////////////////
-
-function showResult(percent,details){
-
-let html=`<h3>Результат: ${percent}%</h3>`;
-
-details.forEach(d=>{
-
-if(d.isCorrect){
-
-html+=`
-<div class="correct">
-${d.ru} → ${d.user} ✔
-</div>
-`;
-
-}else{
-
-html+=`
-<div class="wrong">
-${d.ru} → ${d.user || "(пусто)"} ❌
-(Правильно: ${d.correct})
-</div>
-`;
-
-}
-
-});
-
-document.getElementById("resultArea").innerHTML=html;
-
-}
-
-//////////////////////////////////////////////////
-// НОВАЯ ПОПЫТКА
-//////////////////////////////////////////////////
 
 function newAttempt(){
 
-document.getElementById("resultArea").innerHTML="";
+answers=new Array(words.length).fill("");
 
-renderForm();
+words.forEach((w,i)=>{
 
-window.scrollTo(0,0);
+document.getElementById("input_"+i).innerText="";
 
-}
+});
 
-//////////////////////////////////////////////////
-// НА ГЛАВНУЮ
-//////////////////////////////////////////////////
-
-function goHome(){
-
-location.href="index.html";
+document.getElementById("result").innerHTML="";
 
 }
 
-//////////////////////////////////////////////////
-// ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА
-//////////////////////////////////////////////////
+async function saveResult(percent,detail){
 
-setTimeout(disableAutocomplete,100);
-setTimeout(disableAutocomplete,500);
-setTimeout(disableAutocomplete,1000);
+let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+headers:{"X-Master-Key":API_KEY}
+});
+
+let data=await res.json();
+
+let results=data.record.results||{};
+
+if(!results[currentStudent])
+results[currentStudent]=[];
+
+results[currentStudent].push({
+
+date:new Date().toLocaleString(),
+
+percent:percent,
+
+detail:detail
+
+});
+
+await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+
+method:"PUT",
+
+headers:{
+"Content-Type":"application/json",
+"X-Master-Key":API_KEY
+},
+
+body:JSON.stringify({
+
+instruction:data.record.instruction,
+
+students:data.record.students,
+
+results:results
+
+})
+
+});
+
+}
 
 </script>
 
