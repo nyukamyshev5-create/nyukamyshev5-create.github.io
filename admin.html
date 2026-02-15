@@ -7,12 +7,24 @@
 <script src="config.js"></script>
 
 <style>
-
 body{
-font-family:Arial;
-padding:20px;
+    font-family: Arial;
+    padding:20px;
 }
 
+#panel{
+    margin-top:20px;
+    display:none;
+}
+
+textarea{
+    width:400px;
+    height:150px;
+}
+
+button{
+    margin-top:10px;
+}
 </style>
 
 </head>
@@ -21,128 +33,139 @@ padding:20px;
 <h2>Admin</h2>
 
 Пароль:
-
 <input id="pass" type="password">
-
 <button onclick="login()">Вход</button>
 
-<div id="panel"></div>
+<div id="panel">
+
+<h3>Добавить ученика:</h3>
+
+Имя:<br>
+<input id="name"><br><br>
+
+Слова:<br>
+<textarea id="words"></textarea><br>
+
+<button onclick="add()">Добавить</button>
+
+<div id="status"></div>
+
+</div>
+
 
 <script>
 
-let data=null;
-let sha=null;
+let fileSha = null
+let fileData = null
 
-async function login(){
 
-if(document.getElementById("pass").value!==CONFIG.adminPassword){
+function login(){
 
-alert("wrong");
+    if(document.getElementById("pass").value === CONFIG.adminPassword){
 
-return;
+        document.getElementById("panel").style.display = "block"
+        load()
+
+    }else{
+
+        alert("Неверный пароль")
+
+    }
 
 }
 
-await load();
 
-show();
-
-}
 
 async function load(){
 
-const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/data.json`);
+    const res = await fetch(
+        `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+        {
+            headers:{
+                Authorization:`Bearer ${CONFIG.token}`
+            }
+        }
+    )
 
-const json=await res.json();
+    const json = await res.json()
 
-sha=json.sha;
+    fileSha = json.sha
 
-data=JSON.parse(atob(json.content));
+    const decoded =
+        decodeURIComponent(
+            escape(
+                atob(json.content)
+            )
+        )
 
-}
-
-function show(){
-
-let html="Добавить ученика:<br>";
-
-html+=`Имя:<input id="student"><br>`;
-
-html+=`Слова:<br>`;
-
-html+=`<textarea id="words" rows=10 cols=50></textarea><br>`;
-
-html+=`<button onclick="add()">Добавить</button>`;
-
-html+="<hr>";
-
-Object.keys(data.students).forEach(name=>{
-
-html+=name;
-
-html+=` <button onclick="del('${name}')">Удалить</button><br>`;
-
-});
-
-document.getElementById("panel").innerHTML=html;
+    fileData = JSON.parse(decoded)
 
 }
+
+
 
 async function add(){
 
-const name=document.getElementById("student").value;
+    const name =
+        document.getElementById("name").value.trim()
 
-const lines=document.getElementById("words").value.split("\n");
+    const words =
+        document.getElementById("words").value.trim()
 
-const words=lines.map(l=>{
+    if(!name || !words){
 
-const p=l.split("=");
+        alert("Введите имя и слова")
+        return
 
-return {ru:p[0].trim(),en:p[1].trim()};
+    }
 
-});
+    const list =
+        words.split("\n").map(x=>x.trim()).filter(x=>x)
 
-data.students[name]={words};
+    fileData.students[name] = list
 
-await save();
 
-show();
+    const encoded =
+        btoa(
+            unescape(
+                encodeURIComponent(
+                    JSON.stringify(fileData,null,2)
+                )
+            )
+        )
 
-}
 
-async function del(name){
+    const res = await fetch(
+        `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+        {
+            method:"PUT",
 
-delete data.students[name];
+            headers:{
+                Authorization:`Bearer ${CONFIG.token}`,
+                "Content-Type":"application/json"
+            },
 
-await save();
+            body:JSON.stringify({
+                message:"update students",
+                content:encoded,
+                sha:fileSha
+            })
+        }
+    )
 
-show();
+    if(res.ok){
 
-}
+        document.getElementById("status").innerHTML =
+            "✅ Ученик добавлен"
 
-async function save(){
+        load()
 
-await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/data.json`,{
+    }else{
 
-method:"PUT",
+        document.getElementById("status").innerHTML =
+            "❌ Ошибка"
 
-headers:{
-Authorization:"token "+CONFIG.token,
-"Content-Type":"application/json"
-},
-
-body:JSON.stringify({
-
-message:"update",
-
-content:btoa(JSON.stringify(data,null,2)),
-
-sha
-
-})
-
-});
-
-await load();
+    }
 
 }
 
