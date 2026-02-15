@@ -2,151 +2,278 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Диктант</title>
+<title>Tutor</title>
+
+<script src="config.js"></script>
+
 <style>
 
 body{
 font-family:Arial;
-background:linear-gradient(135deg,#4facfe,#43e97b);
-margin:0;
-padding:20px;
+padding:30px;
+background:#f4f6f9;
 }
 
-.box{
+.panel{
 background:white;
 padding:20px;
-border-radius:10px;
-max-width:600px;
+border-radius:12px;
+max-width:900px;
 margin:auto;
-}
-
-input{
-width:100%;
-padding:8px;
-margin:5px;
+box-shadow:0 8px 25px rgba(0,0,0,0.1);
 }
 
 button{
+padding:6px 12px;
+margin:5px;
+border:none;
+border-radius:6px;
+cursor:pointer;
+background:#4e73df;
+color:white;
+}
+
+button:hover{
+background:#2e59d9;
+}
+
+textarea,input,select{
+width:100%;
+margin:5px 0;
+padding:6px;
+}
+
+.hidden{
+display:none;
+}
+
+.student{
+border:1px solid #ddd;
+padding:10px;
+margin:10px 0;
+border-radius:8px;
+}
+
+.result{
+background:#f8f9fc;
 padding:10px;
 margin-top:10px;
 }
 
 </style>
+
 </head>
 <body>
 
-<div class="box">
+<div id="login" class="panel">
 
-<h2 id="name"></h2>
+<h2>Вход tutor</h2>
 
-<div id="test"></div>
+<input type="password" id="pass" placeholder="Пароль">
 
-<button onclick="submit()">Отправить</button>
+<button onclick="login()">Войти</button>
+
+</div>
+
+<div id="panel" class="panel hidden">
+
+<h2>Инструкция</h2>
+
+<textarea id="instruction" rows="3"></textarea>
+
+<button onclick="saveInstruction()">Сохранить инструкцию</button>
+
+<hr>
+
+<h2>Добавить / изменить ученика</h2>
+
+<input id="studentName" placeholder="Имя ученика">
+
+<textarea id="studentWords" rows="6" placeholder="формат:
+русское:english
+кот:cat
+дом:house"></textarea>
+
+<button onclick="saveStudent()">Сохранить ученика</button>
+
+<hr>
+
+<h2>Ученики</h2>
+
+<div id="students"></div>
 
 </div>
 
 <script>
 
-const USER="nyukamyshev5-create";
-const REPO="nyukamyshev5-create.github.io";
-const FILE="data.json";
+const PASSWORD="tutorai"
 
-let student=localStorage.getItem("student");
+let data={}
+let sha=""
 
-let words=[];
+function login(){
 
-document.getElementById("name").innerText=student;
+if(document.getElementById("pass").value===PASSWORD){
+
+document.getElementById("login").classList.add("hidden")
+
+document.getElementById("panel").classList.remove("hidden")
+
+load()
+
+}
+
+}
 
 async function load(){
 
-const res=await fetch(FILE+"?"+Date.now());
-const data=await res.json();
+const res=await fetch(
+`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+{
+headers:{Authorization:`Bearer ${CONFIG.token}`}
+})
 
-words=data.students[student].words;
+const json=await res.json()
 
-const div=document.getElementById("test");
+sha=json.sha
 
-div.innerHTML="";
+data=JSON.parse(atob(json.content))
 
-words.forEach(w=>{
+document.getElementById("instruction").value=data.instruction||""
 
-const input=document.createElement("input");
-
-input.placeholder=w.ru;
-
-div.appendChild(input);
-
-});
+renderStudents()
 
 }
 
-async function submit(){
+function renderStudents(){
 
-const token=prompt("token");
+let html=""
 
-const inputs=document.querySelectorAll("input");
+for(let name in data.students){
 
-const result=[];
+html+=`
+<div class="student">
 
-inputs.forEach((input,i)=>{
+<b>${name}</b>
 
-result.push({
+<button onclick="editStudent('${name}')">редактировать</button>
 
-ru:words[i].ru,
-correct:words[i].en,
-answer:input.value
+<button onclick="deleteStudent('${name}')">удалить</button>
 
-});
+${renderResult(name)}
 
-});
-
-const res=await fetch(FILE+"?"+Date.now());
-const data=await res.json();
-
-data.students[student].attempts.push({
-
-date:new Date().toLocaleString(),
-
-result
-
-});
-
-await save(data,token);
-
-alert("Сохранено");
+</div>
+`
 
 }
 
-async function save(data,token){
+document.getElementById("students").innerHTML=html
 
-const get=await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`);
+}
 
-const json=await get.json();
+function renderResult(name){
 
-await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`,{
+if(!data.results)return ""
 
-method:"PUT",
+if(!data.results[name])return ""
 
-headers:{
-Authorization:"Bearer "+token,
-"Content-Type":"application/json"
-},
+let r=data.results[name]
 
-body:JSON.stringify({
+return `
+<div class="result">
+Результат: ${r.percent}%
+</div>
+`
 
-message:"update",
+}
 
-content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
+function editStudent(name){
 
-sha:json.sha
+document.getElementById("studentName").value=name
+
+let text=""
+
+data.students[name].forEach(w=>{
+
+text+=`${w.ru}:${w.en}\n`
 
 })
 
-});
+document.getElementById("studentWords").value=text
 
 }
 
-load();
+function deleteStudent(name){
+
+if(!confirm("Удалить ученика?"))return
+
+delete data.students[name]
+
+save()
+
+}
+
+function saveStudent(){
+
+let name=document.getElementById("studentName").value.trim()
+
+let raw=document.getElementById("studentWords").value.trim()
+
+if(!name)return
+
+let words=[]
+
+raw.split("\n").forEach(line=>{
+
+let parts=line.split(":")
+
+if(parts.length>=2){
+
+words.push({
+
+ru:parts[0].trim(),
+en:parts[1].trim()
+
+})
+
+}
+
+})
+
+data.students[name]=words
+
+save()
+
+}
+
+function saveInstruction(){
+
+data.instruction=document.getElementById("instruction").value
+
+save()
+
+}
+
+async function save(){
+
+await fetch(
+`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+{
+method:"PUT",
+headers:{
+Authorization:`Bearer ${CONFIG.token}`,
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+message:"update data",
+content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
+sha:sha
+})
+})
+
+load()
+
+}
 
 </script>
 
