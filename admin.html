@@ -21,10 +21,6 @@ textarea{
     width:400px;
     height:150px;
 }
-
-button{
-    margin-top:10px;
-}
 </style>
 
 </head>
@@ -52,10 +48,8 @@ button{
 
 </div>
 
-
 <script>
 
-let fileSha = null
 let fileData = null
 
 
@@ -64,7 +58,6 @@ function login(){
     if(document.getElementById("pass").value === CONFIG.adminPassword){
 
         document.getElementById("panel").style.display = "block"
-        load()
 
     }else{
 
@@ -76,7 +69,7 @@ function login(){
 
 
 
-async function load(){
+async function getFile(){
 
     const res = await fetch(
         `https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
@@ -89,16 +82,17 @@ async function load(){
 
     const json = await res.json()
 
-    fileSha = json.sha
-
-    const decoded =
+    const content =
         decodeURIComponent(
             escape(
                 atob(json.content)
             )
         )
 
-    fileData = JSON.parse(decoded)
+    return {
+        sha: json.sha,
+        data: JSON.parse(content)
+    }
 
 }
 
@@ -119,17 +113,25 @@ async function add(){
 
     }
 
-    const list =
-        words.split("\n").map(x=>x.trim()).filter(x=>x)
 
-    fileData.students[name] = list
+    const file = await getFile()
+
+    const sha = file.sha
+
+    const data = file.data
+
+
+    data.students[name] =
+        words.split("\n")
+        .map(x=>x.trim())
+        .filter(x=>x)
 
 
     const encoded =
         btoa(
             unescape(
                 encodeURIComponent(
-                    JSON.stringify(fileData,null,2)
+                    JSON.stringify(data,null,2)
                 )
             )
         )
@@ -148,22 +150,21 @@ async function add(){
             body:JSON.stringify({
                 message:"update students",
                 content:encoded,
-                sha:fileSha
+                sha:sha
             })
         }
     )
+
 
     if(res.ok){
 
         document.getElementById("status").innerHTML =
             "✅ Ученик добавлен"
 
-        load()
-
     }else{
 
         document.getElementById("status").innerHTML =
-            "❌ Ошибка"
+            "❌ Ошибка: " + res.status
 
     }
 
