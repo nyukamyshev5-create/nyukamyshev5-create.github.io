@@ -5,33 +5,74 @@
 <title>Админ панель</title>
 
 <style>
-body{font-family:Arial;margin:20px;}
-button{margin:5px;padding:6px 12px;}
-textarea{width:100%;height:150px;}
-.studentBtn{display:block;margin:5px 0;}
-.resultBlock{background:#f5f5f5;padding:10px;margin:10px 0;}
+
+body{
+ font-family:Arial;
+ margin:20px;
+ background:#f4f6f9;
+}
+
+button{
+ padding:6px 12px;
+ margin:3px;
+ border:none;
+ border-radius:6px;
+ cursor:pointer;
+}
+
+.editBtn{background:#4e73df;color:white;}
+.resultBtn{background:#1cc88a;color:white;}
+.deleteBtn{background:#e74a3b;color:white;}
+.addBtn{background:#36b9cc;color:white;}
+
+textarea{
+ width:100%;
+ height:150px;
+ margin-top:10px;
+}
+
+.studentRow{
+ background:white;
+ padding:10px;
+ margin:5px 0;
+ border-radius:8px;
+}
+
+.resultBlock{
+ background:white;
+ padding:10px;
+ margin-top:10px;
+ border-radius:8px;
+}
+
 .correct{color:green;}
 .wrong{color:red;}
+
 </style>
 
 </head>
 <body>
 
 <h2>Ученики</h2>
+
 <div id="studentsList"></div>
-<button onclick="addStudent()">+ Добавить ученика</button>
+
+<button class="addBtn" onclick="addStudent()">+ Добавить ученика</button>
 
 <hr>
 
 <h2 id="editorTitle">Редактор</h2>
+
 <textarea id="words"></textarea>
 <br>
-<button onclick="saveStudent()">Сохранить ученика</button>
+<button class="editBtn" onclick="saveStudent()">Сохранить</button>
 
 <hr>
 
-<h2>Результаты</h2>
+<h2>Результаты ученика</h2>
+
 <div id="results"></div>
+
 
 <script>
 
@@ -41,117 +82,218 @@ const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 let settings={};
 let currentStudent=null;
 
+
 async function load(){
+
  let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
    headers:{"X-Master-Key":API_KEY}
  });
+
  let data=await res.json();
+
  settings=data.record;
 
  if(!settings.students) settings.students={};
  if(!settings.results) settings.results={};
 
  renderStudents();
- renderResults();
 }
+
 
 function renderStudents(){
- let list=document.getElementById("studentsList");
- list.innerHTML="";
+
+ let div=document.getElementById("studentsList");
+
+ div.innerHTML="";
+
  for(let name in settings.students){
-   list.innerHTML+=`<button class="studentBtn" onclick="editStudent('${name}')">${name}</button>`;
+
+   div.innerHTML+=`
+   <div class="studentRow">
+
+     <b>${name}</b>
+
+     <button class="editBtn" onclick="editStudent('${name}')">
+       ✏️ Редактировать
+     </button>
+
+     <button class="resultBtn" onclick="showResults('${name}')">
+       📊 Результаты
+     </button>
+
+     <button class="deleteBtn" onclick="deleteStudent('${name}')">
+       🗑 Удалить
+     </button>
+
+   </div>
+   `;
+
  }
+
 }
 
+
 function editStudent(name){
+
  currentStudent=name;
- document.getElementById("editorTitle").innerText="Редактор: "+name;
+
+ document.getElementById("editorTitle").innerText=
+   "Редактор: "+name;
 
  let text="";
+
  settings.students[name].forEach(w=>{
    text+=`${w.ru}:${w.en}\n`;
  });
 
  document.getElementById("words").value=text;
+
 }
 
+
 function addStudent(){
+
  let name=prompt("Имя ученика:");
+
  if(!name) return;
 
  settings.students[name]=[];
+
  renderStudents();
+
 }
 
+
 async function saveStudent(){
- if(!currentStudent) return alert("Выберите ученика");
+
+ if(!currentStudent){
+   alert("Выберите ученика");
+   return;
+ }
 
  let lines=document.getElementById("words").value.split("\n");
+
  let arr=[];
 
- lines.forEach(l=>{
-   let parts=l.split(":");
+ lines.forEach(line=>{
+
+   let parts=line.split(":");
+
    if(parts.length==2){
+
      arr.push({
        ru:parts[0].trim(),
        en:parts[1].trim()
      });
+
    }
+
  });
 
  settings.students[currentStudent]=arr;
 
+ await saveSettings();
+
+ alert("Сохранено");
+
+}
+
+
+async function deleteStudent(name){
+
+ if(!confirm("Удалить ученика "+name+" ?")) return;
+
+ delete settings.students[name];
+
+ if(settings.results[name]){
+   delete settings.results[name];
+ }
+
+ await saveSettings();
+
+ renderStudents();
+
+ document.getElementById("words").value="";
+ document.getElementById("results").innerHTML="";
+
+}
+
+
+function showResults(name){
+
+ let div=document.getElementById("results");
+
+ div.innerHTML="";
+
+ let attempts=settings.results[name];
+
+ if(!attempts){
+
+   div.innerHTML="Нет результатов";
+
+   return;
+ }
+
+ if(!Array.isArray(attempts)){
+   attempts=[attempts];
+ }
+
+ attempts.forEach((attempt,index)=>{
+
+   let html=`
+   <div class="resultBlock">
+   <h3>Попытка ${index+1}: ${attempt.percent}%</h3>
+   `;
+
+   attempt.details.forEach(d=>{
+
+     if(d.ok){
+
+       html+=`
+       <div class="correct">
+       ${d.ru} → ${d.answer} ✅
+       </div>
+       `;
+
+     }else{
+
+       html+=`
+       <div class="wrong">
+       ${d.ru} → ${d.answer || "(пусто)"} ❌
+       (Правильно: ${d.correct})
+       </div>
+       `;
+
+     }
+
+   });
+
+   html+="</div>";
+
+   div.innerHTML+=html;
+
+ });
+
+}
+
+
+async function saveSettings(){
+
  await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+
    method:"PUT",
+
    headers:{
      "Content-Type":"application/json",
      "X-Master-Key":API_KEY
    },
+
    body:JSON.stringify(settings)
+
  });
 
- alert("Сохранено");
- renderResults();
 }
 
-function renderResults(){
-
- let container=document.getElementById("results");
- container.innerHTML="";
-
- for(let name in settings.results){
-
-   container.innerHTML+=`<h3>${name}</h3>`;
-
-   let attempts=settings.results[name];
-
-   if(!Array.isArray(attempts)){
-     attempts=[attempts];
-   }
-
-   attempts.forEach((a,index)=>{
-
-     if(index==0){
-       container.innerHTML+=`<div class="resultBlock">
-         <b>Попытка 1 — ${a.percent}%</b><br>`;
-
-       a.details.forEach(d=>{
-         if(d.ok){
-           container.innerHTML+=`<div class="correct">${d.ru} → ${d.answer}</div>`;
-         }else{
-           container.innerHTML+=`<div class="wrong">${d.ru} → ${d.answer || "(пусто)"} (Правильно: ${d.correct})</div>`;
-         }
-       });
-
-       container.innerHTML+=`</div>`;
-     }else{
-       container.innerHTML+=`<div>Попытка ${index+1} — ${a.percent}%</div>`;
-     }
-
-   });
- }
-
-}
 
 load();
 
