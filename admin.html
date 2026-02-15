@@ -113,4 +113,245 @@ input{
 const ADMIN_PASSWORD="tutorai";
 
 const SETTINGS_BIN="698f3a3043b1c97be97c510c";
-const API_KE_
+const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+
+let settings={};
+let currentStudent=null;
+
+
+function login(){
+
+ let pass=document.getElementById("password").value;
+
+ if(pass===ADMIN_PASSWORD){
+
+   document.getElementById("loginBox").style.display="none";
+
+   document.getElementById("adminPanel").style.display="block";
+
+   load();
+
+ }else{
+
+   document.getElementById("loginError").innerText="Неверный пароль";
+
+ }
+
+}
+
+
+async function load(){
+
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
+   headers:{"X-Master-Key":API_KEY}
+ });
+
+ let data=await res.json();
+
+ settings=data.record;
+
+ if(!settings.students) settings.students={};
+ if(!settings.results) settings.results={};
+
+ renderStudents();
+}
+
+
+function renderStudents(){
+
+ let div=document.getElementById("studentsList");
+
+ div.innerHTML="";
+
+ for(let name in settings.students){
+
+   div.innerHTML+=`
+   <div class="studentRow">
+
+     <b>${name}</b>
+
+     <button class="editBtn" onclick="editStudent('${name}')">
+       ✏️ Редактировать
+     </button>
+
+     <button class="resultBtn" onclick="showResults('${name}')">
+       📊 Результаты
+     </button>
+
+     <button class="deleteBtn" onclick="deleteStudent('${name}')">
+       🗑 Удалить
+     </button>
+
+   </div>
+   `;
+
+ }
+
+}
+
+
+function editStudent(name){
+
+ currentStudent=name;
+
+ document.getElementById("editorTitle").innerText=
+   "Редактор: "+name;
+
+ let text="";
+
+ settings.students[name].forEach(w=>{
+   text+=`${w.ru}:${w.en}\n`;
+ });
+
+ document.getElementById("words").value=text;
+
+}
+
+
+function addStudent(){
+
+ let name=prompt("Имя ученика:");
+
+ if(!name) return;
+
+ settings.students[name]=[];
+
+ renderStudents();
+
+}
+
+
+async function saveStudent(){
+
+ if(!currentStudent){
+   alert("Выберите ученика");
+   return;
+ }
+
+ let lines=document.getElementById("words").value.split("\n");
+
+ let arr=[];
+
+ lines.forEach(line=>{
+
+   let parts=line.split(":");
+
+   if(parts.length==2){
+
+     arr.push({
+       ru:parts[0].trim(),
+       en:parts[1].trim()
+     });
+
+   }
+
+ });
+
+ settings.students[currentStudent]=arr;
+
+ await saveSettings();
+
+ alert("Сохранено");
+
+}
+
+
+async function deleteStudent(name){
+
+ if(!confirm("Удалить ученика "+name+" ?")) return;
+
+ delete settings.students[name];
+
+ if(settings.results[name]){
+   delete settings.results[name];
+ }
+
+ await saveSettings();
+
+ renderStudents();
+
+ document.getElementById("words").value="";
+ document.getElementById("results").innerHTML="";
+
+}
+
+
+function showResults(name){
+
+ let div=document.getElementById("results");
+
+ div.innerHTML="";
+
+ let attempts=settings.results[name];
+
+ if(!attempts){
+
+   div.innerHTML="Нет результатов";
+
+   return;
+ }
+
+ if(!Array.isArray(attempts)){
+   attempts=[attempts];
+ }
+
+ attempts.forEach((attempt,index)=>{
+
+   let html=`
+   <div class="resultBlock">
+   <h3>Попытка ${index+1}: ${attempt.percent}%</h3>
+   `;
+
+   attempt.details.forEach(d=>{
+
+     if(d.ok){
+
+       html+=`
+       <div class="correct">
+       ${d.ru} → ${d.answer} ✅
+       </div>
+       `;
+
+     }else{
+
+       html+=`
+       <div class="wrong">
+       ${d.ru} → ${d.answer || "(пусто)"} ❌
+       (Правильно: ${d.correct})
+       </div>
+       `;
+
+     }
+
+   });
+
+   html+="</div>";
+
+   div.innerHTML+=html;
+
+ });
+
+}
+
+
+async function saveSettings(){
+
+ await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
+
+   method:"PUT",
+
+   headers:{
+     "Content-Type":"application/json",
+     "X-Master-Key":API_KEY
+   },
+
+   body:JSON.stringify(settings)
+
+ });
+
+}
+
+</script>
+
+</body>
+</html>
