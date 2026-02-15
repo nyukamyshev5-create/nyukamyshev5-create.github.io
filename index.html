@@ -2,83 +2,88 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Диктанты</title>
-
+<title>Ученики</title>
 <style>
+
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#4facfe,#43e97b);
-margin:0;
+height:100vh;
+display:flex;
+justify-content:center;
+align-items:center;
 }
 
 .box{
 background:white;
-width:400px;
-margin:100px auto;
-padding:20px;
+padding:30px;
 border-radius:10px;
 text-align:center;
 }
 
 button{
 padding:10px 20px;
-margin:5px;
+margin:10px;
 cursor:pointer;
 }
+
 </style>
 </head>
 
 <body>
 
 <div class="box">
-<h2>Ученики</h2>
+
+<h2>Выберите ученика</h2>
 
 <div id="students"></div>
 
 <br>
-<button onclick="admin()">Админ</button>
+
+<button onclick="location.href='admin.html'">
+Админ
+</button>
 
 </div>
 
 <script>
 
-const url="data.json?"+Date.now()
+const USER="nyukamyshev5"
+const REPO="nyukamyshev5-create"
 
-fetch(url)
-.then(r=>r.json())
-.then(data=>{
+async function load(){
+
+const res=await fetch(
+`https://raw.githubusercontent.com/${USER}/${REPO}/main/data.json?nocache=`+Date.now()
+)
+
+const data=await res.json()
 
 const div=document.getElementById("students")
+
+div.innerHTML=""
 
 for(const name in data.students){
 
 div.innerHTML+=`
-<button onclick="openStudent('${name}')">
+<button onclick="start('${name}')">
 ${name}
 </button>
-<br>
 `
-}
-
-})
-
-function openStudent(name){
-
-location.href="tutor.html?student="+encodeURIComponent(name)
 
 }
 
-function admin(){
+}
 
-const pass=prompt("Пароль")
+function start(name){
 
-if(pass==="tutorai")
-location.href="admin.html"
+localStorage.setItem("student",name)
 
-else
-alert("Неверный пароль")
+location.href="tutor.html"
 
 }
+
+load()
 
 </script>
 
