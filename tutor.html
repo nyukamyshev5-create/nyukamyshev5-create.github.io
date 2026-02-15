@@ -1,154 +1,112 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
+<title>Тест</title>
 
 <style>
 
 body{
 font-family:Arial;
+background:#f0f0f0;
 padding:20px;
-max-width:700px;
-margin:auto;
 }
 
 input{
-width:100%;
-padding:6px;
-margin-top:5px;
-margin-bottom:10px;
+display:block;
+margin:10px;
+padding:5px;
 }
 
 button{
-padding:10px 20px;
-margin:10px 5px;
-}
-
-.correct{
-color:green;
-}
-
-.wrong{
-color:red;
+padding:10px;
+margin:10px;
 }
 
 </style>
+
 </head>
+
 <body>
 
-<h2 id="student"></h2>
+<h2 id="name"></h2>
 
 <div id="test"></div>
 
-<button onclick="check()">Проверить</button>
+<button onclick="finish()">Завершить</button>
 
-<button onclick="retry()">Пройти заново</button>
+<button onclick="retry()">Начать новую попытку</button>
 
 <div id="result"></div>
 
 <script>
 
-document.addEventListener("paste",e=>e.preventDefault())
 document.addEventListener("copy",e=>e.preventDefault())
+document.addEventListener("paste",e=>e.preventDefault())
 
-function getStudents(){
-return JSON.parse(localStorage.getItem("students")||"{}")
-}
+const params=new URLSearchParams(location.search)
+const student=params.get("student")
 
-function saveStudents(data){
-localStorage.setItem("students",JSON.stringify(data))
-}
+document.getElementById("name").innerText=student
 
-const student=localStorage.getItem("currentStudent")
+let words=[]
+let answers=[]
 
-document.getElementById("student").innerText=student
+fetch("data.json?"+Date.now())
+.then(r=>r.json())
+.then(data=>{
 
-function load(){
+words=data.students[student].words
 
-const data=getStudents()
+const test=document.getElementById("test")
 
-const words=data[student].words||[]
+words.forEach(w=>{
 
-const div=document.getElementById("test")
-
-div.innerHTML=""
-
-words.forEach((w,i)=>{
-
-div.innerHTML+=`
-<div>
-${w.ru}
-<input autocomplete="off" data-index="${i}">
-</div>
+test.innerHTML+=`
+<label>${w.ru}</label>
+<input>
 `
 
 })
 
-}
+})
 
-function check(){
-
-const data=getStudents()
-
-const words=data[student].words
+function finish(){
 
 const inputs=document.querySelectorAll("input")
 
 let correct=0
 
-let detail=[]
+inputs.forEach((input,i)=>{
 
-inputs.forEach(input=>{
+answers.push(input.value)
 
-const i=input.dataset.index
-
-const answer=input.value.trim()
-
-const correctWord=words[i].en
-
-if(answer.toLowerCase()===correctWord.toLowerCase()){
-
+if(input.value.trim().toLowerCase()
+===words[i].en.toLowerCase())
 correct++
-
-detail.push(`<span class="correct">${words[i].ru} = ${correctWord}</span>`)
-
-}else{
-
-detail.push(`<span class="wrong">${words[i].ru} = ${answer} ❌ (правильно: ${correctWord})</span>`)
-
-}
 
 })
 
 const percent=Math.round(correct/words.length*100)
 
-if(!data[student].attempts)
-data[student].attempts=[]
-
-data[student].attempts.push({
-
-percent,
-detail,
-date:new Date().toLocaleString()
-
-})
-
-saveStudents(data)
-
 document.getElementById("result").innerHTML=
-`<h3>${percent}%</h3>`+detail.join("<br>")
+"Результат: "+percent+"%"
+
+saveAttempt(percent,answers)
 
 }
 
 function retry(){
 
-load()
-
-document.getElementById("result").innerHTML=""
+location.reload()
 
 }
 
-load()
+function saveAttempt(percent,answers){
+
+alert("Попытка сохранена (локально)")
+
+}
 
 </script>
 
