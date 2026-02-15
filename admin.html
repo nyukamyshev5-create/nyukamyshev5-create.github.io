@@ -1,355 +1,131 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Админ панель</title>
+<title>Админка</title>
 
 <style>
-
 body{
- font-family:Arial;
- margin:20px;
- background:#f4f6f9;
+font-family:Arial;
+padding:20px;
+}
+
+textarea{
+width:100%;
+height:120px;
 }
 
 button{
- padding:6px 12px;
- margin:3px;
- border:none;
- border-radius:6px;
- cursor:pointer;
+margin:5px;
+padding:6px 12px;
 }
-
-.editBtn{background:#4e73df;color:white;}
-.resultBtn{background:#1cc88a;color:white;}
-.deleteBtn{background:#e74a3b;color:white;}
-.addBtn{background:#36b9cc;color:white;}
-
-textarea{
- width:100%;
- height:150px;
- margin-top:10px;
-}
-
-.studentRow{
- background:white;
- padding:10px;
- margin:5px 0;
- border-radius:8px;
-}
-
-.resultBlock{
- background:white;
- padding:10px;
- margin-top:10px;
- border-radius:8px;
-}
-
-.correct{color:green;}
-.wrong{color:red;}
-
-#loginBox{
- width:300px;
- margin:100px auto;
- background:white;
- padding:20px;
- border-radius:10px;
- text-align:center;
-}
-
-input{
- padding:8px;
- width:90%;
- margin-top:10px;
-}
-
 </style>
-
 </head>
 <body>
 
-<div id="loginBox">
+<h2>Админка</h2>
 
-<h3>Вход в админку</h3>
+<input id="name" placeholder="Имя ученика">
 
-<input type="password" id="password" placeholder="Введите пароль">
+<textarea id="words" placeholder="слова через enter"></textarea>
 
-<br><br>
-
-<button onclick="login()">Войти</button>
-
-<p id="loginError" style="color:red;"></p>
-
-</div>
-
-
-<div id="adminPanel" style="display:none;">
-
-<h2>Ученики</h2>
-
-<div id="studentsList"></div>
-
-<button class="addBtn" onclick="addStudent()">+ Добавить ученика</button>
-
-<hr>
-
-<h2 id="editorTitle">Редактор</h2>
-
-<textarea id="words"></textarea>
 <br>
-<button class="editBtn" onclick="saveStudent()">Сохранить</button>
+
+<button onclick="save()">Сохранить</button>
 
 <hr>
 
-<h2>Результаты ученика</h2>
-
-<div id="results"></div>
-
-</div>
-
+<div id="list"></div>
 
 <script>
 
-const ADMIN_PASSWORD="tutorai";
+function getData(){
+return JSON.parse(localStorage.getItem("students")||"{}")
+}
 
-const SETTINGS_BIN="698f3a3043b1c97be97c510c";
-const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+function saveData(data){
+localStorage.setItem("students",JSON.stringify(data))
+}
 
-let settings={};
-let currentStudent=null;
+function save(){
 
+const name=document.getElementById("name").value
 
-function login(){
+const words=document.getElementById("words").value.split("\n")
 
- let pass=document.getElementById("password").value;
+if(!name)return
 
- if(pass===ADMIN_PASSWORD){
+const data=getData()
 
-   document.getElementById("loginBox").style.display="none";
+if(!data[name])
+data[name]={attempts:[]}
 
-   document.getElementById("adminPanel").style.display="block";
+data[name].words=words
 
-   load();
+saveData(data)
 
- }else{
-
-   document.getElementById("loginError").innerText="Неверный пароль";
-
- }
+load()
 
 }
 
+function deleteStudent(name){
 
-async function load(){
+const data=getData()
 
- let res=await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}/latest`,{
-   headers:{"X-Master-Key":API_KEY}
- });
+delete data[name]
 
- let data=await res.json();
+saveData(data)
 
- settings=data.record;
-
- if(!settings.students) settings.students={};
- if(!settings.results) settings.results={};
-
- renderStudents();
-}
-
-
-function renderStudents(){
-
- let div=document.getElementById("studentsList");
-
- div.innerHTML="";
-
- for(let name in settings.students){
-
-   div.innerHTML+=`
-   <div class="studentRow">
-
-     <b>${name}</b>
-
-     <button class="editBtn" onclick="editStudent('${name}')">
-       ✏️ Редактировать
-     </button>
-
-     <button class="resultBtn" onclick="showResults('${name}')">
-       📊 Результаты
-     </button>
-
-     <button class="deleteBtn" onclick="deleteStudent('${name}')">
-       🗑 Удалить
-     </button>
-
-   </div>
-   `;
-
- }
+load()
 
 }
 
+function showAttempts(name){
 
-function editStudent(name){
+const data=getData()
 
- currentStudent=name;
+let html=""
 
- document.getElementById("editorTitle").innerText=
-   "Редактор: "+name;
+data[name].attempts.forEach((a,i)=>{
 
- let text="";
+html+="<div>Попытка "+(i+1)+" "+a.percent+"%</div>"
 
- settings.students[name].forEach(w=>{
-   text+=`${w.ru}:${w.en}\n`;
- });
+})
 
- document.getElementById("words").value=text;
+document.getElementById("attempts_"+name).innerHTML=html
 
 }
 
+function load(){
 
-function addStudent(){
+const data=getData()
 
- let name=prompt("Имя ученика:");
+const div=document.getElementById("list")
 
- if(!name) return;
+div.innerHTML=""
 
- settings.students[name]=[];
+for(const name in data){
 
- renderStudents();
+div.innerHTML+=`
+<hr>
+<b>${name}</b>
 
-}
+<button onclick="deleteStudent('${name}')">
+Удалить
+</button>
 
+<button onclick="showAttempts('${name}')">
+Попытки
+</button>
 
-async function saveStudent(){
-
- if(!currentStudent){
-   alert("Выберите ученика");
-   return;
- }
-
- let lines=document.getElementById("words").value.split("\n");
-
- let arr=[];
-
- lines.forEach(line=>{
-
-   let parts=line.split(":");
-
-   if(parts.length==2){
-
-     arr.push({
-       ru:parts[0].trim(),
-       en:parts[1].trim()
-     });
-
-   }
-
- });
-
- settings.students[currentStudent]=arr;
-
- await saveSettings();
-
- alert("Сохранено");
+<div id="attempts_${name}"></div>
+`
 
 }
 
-
-async function deleteStudent(name){
-
- if(!confirm("Удалить ученика "+name+" ?")) return;
-
- delete settings.students[name];
-
- if(settings.results[name]){
-   delete settings.results[name];
- }
-
- await saveSettings();
-
- renderStudents();
-
- document.getElementById("words").value="";
- document.getElementById("results").innerHTML="";
-
 }
 
-
-function showResults(name){
-
- let div=document.getElementById("results");
-
- div.innerHTML="";
-
- let attempts=settings.results[name];
-
- if(!attempts){
-
-   div.innerHTML="Нет результатов";
-
-   return;
- }
-
- if(!Array.isArray(attempts)){
-   attempts=[attempts];
- }
-
- attempts.forEach((attempt,index)=>{
-
-   let html=`
-   <div class="resultBlock">
-   <h3>Попытка ${index+1}: ${attempt.percent}%</h3>
-   `;
-
-   attempt.details.forEach(d=>{
-
-     if(d.ok){
-
-       html+=`
-       <div class="correct">
-       ${d.ru} → ${d.answer} ✅
-       </div>
-       `;
-
-     }else{
-
-       html+=`
-       <div class="wrong">
-       ${d.ru} → ${d.answer || "(пусто)"} ❌
-       (Правильно: ${d.correct})
-       </div>
-       `;
-
-     }
-
-   });
-
-   html+="</div>";
-
-   div.innerHTML+=html;
-
- });
-
-}
-
-
-async function saveSettings(){
-
- await fetch(`https://api.jsonbin.io/v3/b/${SETTINGS_BIN}`,{
-
-   method:"PUT",
-
-   headers:{
-     "Content-Type":"application/json",
-     "X-Master-Key":API_KEY
-   },
-
-   body:JSON.stringify(settings)
-
- });
-
-}
+load()
 
 </script>
 
