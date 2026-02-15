@@ -3,170 +3,150 @@
 <head>
 <meta charset="UTF-8">
 <title>Диктант</title>
-</head>
+<style>
 
+body{
+font-family:Arial;
+background:linear-gradient(135deg,#4facfe,#43e97b);
+margin:0;
+padding:20px;
+}
+
+.box{
+background:white;
+padding:20px;
+border-radius:10px;
+max-width:600px;
+margin:auto;
+}
+
+input{
+width:100%;
+padding:8px;
+margin:5px;
+}
+
+button{
+padding:10px;
+margin-top:10px;
+}
+
+</style>
+</head>
 <body>
 
-<h2 id="studentName"></h2>
+<div class="box">
+
+<h2 id="name"></h2>
 
 <div id="test"></div>
 
-<button onclick="check()">Проверить</button>
-
-<button onclick="restart()">Пройти заново</button>
-
-<div id="result"></div>
-
-<script>
-
-const TOKEN="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"
-const USER="nyukamyshev5"
-const REPO="nyukamyshev5-create"
-
-let student=
-localStorage.getItem("student")
-
-let words=[]
-
-let sha=""
-
-document.getElementById("studentName")
-.innerText=student
-
-load()
-
-async function load(){
-
-const res=await fetch(
-`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`
-)
-
-const json=await res.json()
-
-sha=json.sha
-
-const data=JSON.parse(atob(json.content))
-
-words=data.students[student].words
-
-render()
-
-}
-
-function render(){
-
-const div=document.getElementById("test")
-
-div.innerHTML=""
-
-words.forEach((w,i)=>{
-
-div.innerHTML+=`
-
-<div>
-
-${w.ru}
-
-<br>
-
-<input id="input${i}">
+<button onclick="submit()">Отправить</button>
 
 </div>
 
-<br>
+<script>
 
-`
+const USER="nyukamyshev5-create";
+const REPO="nyukamyshev5-create.github.io";
+const FILE="data.json";
 
-})
+let student=localStorage.getItem("student");
 
-}
+let words=[];
 
-async function check(){
+document.getElementById("name").innerText=student;
 
-let correct=0
+async function load(){
 
-let answers=[]
+const res=await fetch(FILE+"?"+Date.now());
+const data=await res.json();
 
-words.forEach((w,i)=>{
+words=data.students[student].words;
 
-const val=
-document.getElementById("input"+i).value.trim()
+const div=document.getElementById("test");
 
-answers.push(val)
+div.innerHTML="";
 
-if(val.toLowerCase()==w.en.toLowerCase())
-correct++
+words.forEach(w=>{
 
-})
+const input=document.createElement("input");
 
-const percent=
-Math.round(correct/words.length*100)
+input.placeholder=w.ru;
 
-document.getElementById("result")
-.innerHTML="Результат: "+percent+"%"
+div.appendChild(input);
 
-await saveAttempt(percent,answers)
-
-}
-
-function restart(){
-
-render()
-
-document.getElementById("result").innerHTML=""
+});
 
 }
 
-async function saveAttempt(percent,answers){
+async function submit(){
 
-const res=await fetch(
-`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`
-)
+const token=prompt("token");
 
-const json=await res.json()
+const inputs=document.querySelectorAll("input");
 
-let data=JSON.parse(atob(json.content))
+const result=[];
 
-if(!data.students[student].attempts)
-data.students[student].attempts=[]
+inputs.forEach((input,i)=>{
+
+result.push({
+
+ru:words[i].ru,
+correct:words[i].en,
+answer:input.value
+
+});
+
+});
+
+const res=await fetch(FILE+"?"+Date.now());
+const data=await res.json();
 
 data.students[student].attempts.push({
 
 date:new Date().toLocaleString(),
 
-percent:percent,
+result
 
-answers:answers
+});
 
-})
+await save(data,token);
 
-const content=btoa(
-JSON.stringify(data,null,2)
-)
+alert("Сохранено");
 
-await fetch(
-`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`,
-{
+}
+
+async function save(data,token){
+
+const get=await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`);
+
+const json=await get.json();
+
+await fetch(`https://api.github.com/repos/${USER}/${REPO}/contents/${FILE}`,{
+
 method:"PUT",
 
 headers:{
-Authorization:`Bearer ${TOKEN}`
+Authorization:"Bearer "+token,
+"Content-Type":"application/json"
 },
 
 body:JSON.stringify({
 
-message:"save attempt",
+message:"update",
 
-content:content,
+content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
 
 sha:json.sha
 
 })
 
-}
-)
+});
 
 }
+
+load();
 
 </script>
 
