@@ -19,23 +19,19 @@ align-items:center;
 background:white;
 padding:30px;
 border-radius:12px;
-width:400px;
+width:420px;
 text-align:center;
 }
 
 button{
 padding:10px 20px;
-margin:10px;
+margin:6px;
 border:none;
 border-radius:8px;
 background:#4facfe;
 color:white;
 cursor:pointer;
-}
-
-.student{
-display:block;
-width:100%;
+width:200px;
 }
 </style>
 </head>
@@ -43,9 +39,11 @@ width:100%;
 
 <div class="card">
 
-<h2>Ученики</h2>
+<h2>Выберите ученика</h2>
 
 <div id="students"></div>
+
+<hr>
 
 <button onclick="admin()">Tutor</button>
 
@@ -53,27 +51,21 @@ width:100%;
 
 <script>
 
-function getData(){
+function getStudents(){
 return JSON.parse(localStorage.getItem("students")||"{}")
 }
 
-function saveData(data){
-localStorage.setItem("students",JSON.stringify(data))
-}
+function loadStudents(){
 
-function load(){
-
-const students=getData()
+const data=getStudents()
 
 const div=document.getElementById("students")
 
 div.innerHTML=""
 
-for(const name in students){
+Object.keys(data).forEach(name=>{
 
 const btn=document.createElement("button")
-
-btn.className="student"
 
 btn.innerText=name
 
@@ -84,20 +76,23 @@ location.href="tutor.html"
 
 div.appendChild(btn)
 
-}
+})
 
 }
 
 function admin(){
 
-const pass=prompt("Пароль")
+const pass=prompt("Введите пароль")
 
 if(pass==="tutorai")
 location.href="admin.html"
 
+else
+alert("Неверный пароль")
+
 }
 
-load()
+loadStudents()
 
 </script>
 
