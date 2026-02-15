@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Диктанты</title>
@@ -8,81 +8,69 @@
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#4facfe,#43e97b);
-height:100vh;
 margin:0;
-display:flex;
-justify-content:center;
-align-items:center;
 }
 
-.card{
+.box{
 background:white;
-padding:30px;
-border-radius:12px;
-width:420px;
+width:400px;
+margin:100px auto;
+padding:20px;
+border-radius:10px;
 text-align:center;
 }
 
 button{
 padding:10px 20px;
-margin:6px;
-border:none;
-border-radius:8px;
-background:#4facfe;
-color:white;
+margin:5px;
 cursor:pointer;
-width:200px;
 }
 </style>
 </head>
+
 <body>
 
-<div class="card">
-
-<h2>Выберите ученика</h2>
+<div class="box">
+<h2>Ученики</h2>
 
 <div id="students"></div>
 
-<hr>
-
-<button onclick="admin()">Tutor</button>
+<br>
+<button onclick="admin()">Админ</button>
 
 </div>
 
 <script>
 
-function getStudents(){
-return JSON.parse(localStorage.getItem("students")||"{}")
-}
+const url="data.json?"+Date.now()
 
-function loadStudents(){
-
-const data=getStudents()
+fetch(url)
+.then(r=>r.json())
+.then(data=>{
 
 const div=document.getElementById("students")
 
-div.innerHTML=""
+for(const name in data.students){
 
-Object.keys(data).forEach(name=>{
-
-const btn=document.createElement("button")
-
-btn.innerText=name
-
-btn.onclick=()=>{
-localStorage.setItem("currentStudent",name)
-location.href="tutor.html"
+div.innerHTML+=`
+<button onclick="openStudent('${name}')">
+${name}
+</button>
+<br>
+`
 }
 
-div.appendChild(btn)
-
 })
+
+function openStudent(name){
+
+location.href="tutor.html?student="+encodeURIComponent(name)
 
 }
 
 function admin(){
 
-const pass=prompt("Введите пароль")
+const pass=prompt("Пароль")
 
 if(pass==="tutorai")
 location.href="admin.html"
@@ -91,8 +79,6 @@ else
 alert("Неверный пароль")
 
 }
-
-loadStudents()
 
 </script>
 
