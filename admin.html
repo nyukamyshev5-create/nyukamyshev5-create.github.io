@@ -1,182 +1,162 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Админка</title>
-
-<style>
-body{
-font-family:Arial;
-padding:20px;
-max-width:800px;
-margin:auto;
-}
-
-textarea{
-width:100%;
-height:150px;
-margin-top:10px;
-}
-
-input{
-width:100%;
-padding:8px;
-margin-top:10px;
-}
-
-button{
-margin:5px;
-padding:6px 12px;
-cursor:pointer;
-}
-
-.student{
-border:1px solid #ccc;
-padding:10px;
-margin-top:10px;
-}
-</style>
+<title>Админ</title>
 </head>
+
 <body>
 
 <h2>Админка</h2>
 
 <input id="studentName" placeholder="Имя ученика">
 
-<textarea id="words" placeholder="долгосрочный спад = long-term decline"></textarea>
-
-<button onclick="saveStudent()">Сохранить ученика</button>
-
-<hr>
+<button onclick="addStudent()">Добавить</button>
 
 <div id="students"></div>
 
 <script>
 
-function getStudents(){
-return JSON.parse(localStorage.getItem("students")||"{}")
-}
+const TOKEN="PASTE_NEW_TOKEN_HERE"
+const USER="nyukamyshev5"
+const REPO="nyukamyshev5-create"
 
-function saveStudents(data){
-localStorage.setItem("students",JSON.stringify(data))
-}
+let sha=""
+let data={}
 
-function parseWords(text){
+load()
 
-return text
-.split("\n")
-.map(line=>{
+async function load(){
 
-const parts=line.split("=")
+const res=await fetch(
+`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`
+)
 
-if(parts.length<2)return null
+const json=await res.json()
 
-return {
-ru:parts[0].trim(),
-en:parts[1].trim()
-}
+sha=json.sha
 
-})
-.filter(x=>x)
+data=JSON.parse(atob(json.content))
+
+render()
 
 }
 
-function saveStudent(){
-
-const name=document.getElementById("studentName").value.trim()
-
-const wordsText=document.getElementById("words").value.trim()
-
-if(!name){
-alert("Введите имя")
-return
-}
-
-const data=getStudents()
-
-if(!data[name])
-data[name]={attempts:[]}
-
-data[name].words=parseWords(wordsText)
-
-saveStudents(data)
-
-loadStudents()
-
-alert("Сохранено")
-
-}
-
-function deleteStudent(name){
-
-if(!confirm("Удалить ученика?"))return
-
-const data=getStudents()
-
-delete data[name]
-
-saveStudents(data)
-
-loadStudents()
-
-}
-
-function showAttempts(name){
-
-const data=getStudents()
-
-const div=document.getElementById("attempts_"+name)
-
-const attempts=data[name].attempts||[]
-
-if(attempts.length===0){
-div.innerHTML="Нет попыток"
-return
-}
-
-let html=""
-
-attempts.forEach((a,i)=>{
-
-html+=`
-<div>
-<b>Попытка ${i+1}: ${a.percent}%</b><br>
-${a.detail.join("<br>")}
-<hr>
-</div>
-`
-
-})
-
-div.innerHTML=html
-
-}
-
-function loadStudents(){
-
-const data=getStudents()
+function render(){
 
 const div=document.getElementById("students")
 
 div.innerHTML=""
 
-Object.keys(data).forEach(name=>{
+for(const name in data.students){
 
 div.innerHTML+=`
-<div class="student">
 
-<b>${name}</b><br>
+<hr>
+
+<h3>${name}</h3>
+
+<textarea id="words_${name}" rows="10" cols="50">
+${formatWords(name)}
+</textarea>
+
+<br>
+
+<button onclick="saveWords('${name}')">
+Сохранить слова
+</button>
+
+<button onclick="deleteStudent('${name}')">
+Удалить ученика
+</button>
 
 <button onclick="showAttempts('${name}')">
 Попытки
 </button>
 
-<button onclick="deleteStudent('${name}')">
-Удалить
-</button>
-
 <div id="attempts_${name}"></div>
 
+`
+
+}
+
+}
+
+function formatWords(name){
+
+return data.students[name].words
+.map(w=>`${w.ru} = ${w.en}`)
+.join("\n")
+
+}
+
+async function saveWords(name){
+
+const text=
+document.getElementById("words_"+name).value
+
+const lines=text.split("\n")
+
+data.students[name].words=[]
+
+lines.forEach(line=>{
+
+if(line.includes("=")){
+
+const parts=line.split("=")
+
+data.students[name].words.push({
+
+ru:parts[0].trim(),
+en:parts[1].trim()
+
+})
+
+}
+
+})
+
+await save()
+
+}
+
+async function addStudent(){
+
+const name=
+document.getElementById("studentName").value
+
+data.students[name]={
+
+words:[],
+attempts:[]
+
+}
+
+await save()
+
+}
+
+async function deleteStudent(name){
+
+delete data.students[name]
+
+await save()
+
+}
+
+function showAttempts(name){
+
+const div=
+document.getElementById("attempts_"+name)
+
+div.innerHTML=""
+
+data.students[name].attempts
+?.forEach(a=>{
+
+div.innerHTML+=`
+<div>
+${a.date} — ${a.percent}%
 </div>
 `
 
@@ -184,7 +164,37 @@ div.innerHTML+=`
 
 }
 
-loadStudents()
+async function save(){
+
+const content=btoa(
+JSON.stringify(data,null,2)
+)
+
+await fetch(
+`https://api.github.com/repos/${USER}/${REPO}/contents/data.json`,
+{
+method:"PUT",
+
+headers:{
+Authorization:`Bearer ${TOKEN}`
+},
+
+body:JSON.stringify({
+
+message:"update data",
+
+content:content,
+
+sha:sha
+
+})
+
+}
+)
+
+load()
+
+}
 
 </script>
 
