@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>Тест</title>
@@ -8,130 +8,125 @@
 
 <style>
 body{
-font-family:Arial;
-background:linear-gradient(135deg,#4facfe,#43e97b);
-color:white;
-text-align:center;
-padding:20px;
+    font-family: Arial;
+    background: linear-gradient(90deg,#4facfe,#43e97b);
+    margin:0;
 }
 
-.box{
-background:white;
-color:black;
-padding:20px;
-border-radius:10px;
-display:inline-block;
-}
-
-input{
-font-size:18px;
-padding:5px;
-margin:5px;
-width:300px;
+#login, #test{
+    background:white;
+    width:400px;
+    margin:100px auto;
+    padding:20px;
+    border-radius:10px;
+    text-align:center;
 }
 
 button{
-font-size:18px;
-padding:10px;
-margin:10px;
+    padding:10px 20px;
+    font-size:16px;
+}
+
+#question{
+    font-size:22px;
+    margin:20px;
+}
+
+input{
+    padding:10px;
+    font-size:16px;
+    width:80%;
 }
 </style>
 </head>
 <body>
 
-<div class="box">
-
+<div id="login">
 <h2>Введите имя</h2>
-
 <input id="name">
-
-<br>
-
+<br><br>
 <button onclick="start()">Начать</button>
+<div id="error" style="color:red"></div>
+</div>
 
-<div id="test"></div>
-
+<div id="test" style="display:none">
+<div id="question"></div>
+<input id="answer">
+<br><br>
+<button onclick="check()">Ответить</button>
+<div id="result"></div>
 </div>
 
 <script>
 
-let studentName="";
-let words=[];
-
-function blockStudentProtection(){
-
-document.addEventListener("copy", e=>e.preventDefault());
-document.addEventListener("paste", e=>e.preventDefault());
-
-document.addEventListener("keydown", function(e){
-
-if(e.ctrlKey && (e.key==="v"||e.key==="c"))
-e.preventDefault();
-
-});
-
-}
-
-blockStudentProtection();
+let words = []
+let current = null
 
 async function loadData(){
 
-const res=await fetch("data.json?"+Date.now());
+const url =
+`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}?ref=${CONFIG.branch}`
 
-return await res.json();
+const res = await fetch(url,{
+headers:{
+Authorization:`Bearer ${CONFIG.token}`
+}
+})
 
+const json = await res.json()
+
+const content = JSON.parse(atob(json.content))
+
+return content
 }
 
 async function start(){
 
-studentName=document.getElementById("name").value.trim();
+const name = document.getElementById("name").value.trim()
 
-if(!studentName)return;
+if(!name)return
 
-const data=await loadData();
+const data = await loadData()
 
-if(!data.students[studentName]){
-
-alert("Ученика нет");
-
-return;
-
+if(!data.students[name]){
+document.getElementById("error").innerText="Ученик не найден"
+return
 }
 
-words=data.students[studentName].words;
+words = data.students[name]
 
-showTest();
+document.getElementById("login").style.display="none"
+document.getElementById("test").style.display="block"
 
+next()
 }
 
-function showTest(){
+function next(){
 
-let html="<h3>"+studentName+"</h3>";
+current = words[Math.floor(Math.random()*words.length)]
 
-words.forEach((w,i)=>{
+document.getElementById("question").innerText=current.en
 
-html+=w.ru+"<br>";
-html+=`<input id="a${i}"><br><br>`;
-
-});
-
-html+=`<button onclick="save()">Отправить</button>`;
-
-html+=`<button onclick="retry()">Начать новую попытку</button>`;
-
-document.getElementById("test").innerHTML=html;
-
+document.getElementById("answer").value=""
+document.getElementById("result").innerText=""
 }
 
-function retry(){
+function check(){
 
-showTest();
+const answer =
+document.getElementById("answer").value.trim().toLowerCase()
 
+if(answer==current.ru.toLowerCase()){
+
+document.getElementById("result").innerHTML="✅ Правильно"
+}
+else{
+
+document.getElementById("result").innerHTML=
+"❌ Правильно: "+current.ru
 }
 
-function save(){
-
-alert("Ответы сохранены (визуально)");
+setTimeout(next,1000)
 
 }
 
