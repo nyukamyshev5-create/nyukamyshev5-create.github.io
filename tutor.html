@@ -1,263 +1,135 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>Tutor</title>
 
 <style>
 
 body{
 font-family:Arial;
-background:linear-gradient(135deg,#36b9cc,#1cc88a);
-text-align:center;
+padding:20px;
 }
 
-.container{
-background:white;
-max-width:900px;
-margin:40px auto;
-padding:30px;
-border-radius:15px;
+input{
+display:block;
+margin:5px;
+padding:5px;
 }
 
 button{
-padding:8px 12px;
-margin:5px;
-border:none;
-border-radius:8px;
-background:#36b9cc;
-color:white;
-cursor:pointer;
-}
-
-textarea{
-width:100%;
-height:150px;
-}
-
-.correct{color:green;}
-.wrong{color:red;}
-
-.studentBox{
-border:1px solid #ddd;
-padding:10px;
 margin:10px;
-border-radius:10px;
+padding:8px 15px;
 }
 
 </style>
-
 </head>
 <body>
 
-<div class="container">
+<h2 id="name"></h2>
 
-<h2>Tutor кабинет</h2>
+<div id="test"></div>
 
-<h3>Инструкция</h3>
-<textarea id="instruction"></textarea>
-<br>
-<button onclick="saveInstruction()">Сохранить инструкцию</button>
+<button onclick="check()">Проверить</button>
 
-<hr>
+<button onclick="retry()">Новая попытка</button>
 
-<h3>Добавить ученика</h3>
-
-<input id="studentName" placeholder="Имя ученика">
-<br><br>
-
-<textarea id="studentWords"
-placeholder="дом:house
-кот:cat
-стул:chair"></textarea>
-
-<br>
-<button onclick="addStudent()">Добавить ученика</button>
-
-<hr>
-
-<h3>Ученики и результаты</h3>
-
-<div id="students"></div>
-
-</div>
+<div id="result"></div>
 
 <script>
 
-let data;
+document.addEventListener("paste",e=>e.preventDefault())
+document.addEventListener("copy",e=>e.preventDefault())
 
-//////////////////////////////////////////////////
+function getData(){
+return JSON.parse(localStorage.getItem("students")||"{}")
+}
 
-function loadData(){
+function saveData(data){
+localStorage.setItem("students",JSON.stringify(data))
+}
 
-let local=localStorage.getItem("dictationData");
+const student=localStorage.getItem("currentStudent")
 
-if(local)
-data=JSON.parse(local);
+document.getElementById("name").innerText=student
 
-else
-data={
-instruction:"Введите перевод",
-students:{},
-results:{}
-};
+function load(){
 
-document.getElementById("instruction").value=data.instruction;
+const data=getData()
 
-showStudents();
+const words=data[student].words
+
+const div=document.getElementById("test")
+
+div.innerHTML=""
+
+words.forEach(w=>{
+
+div.innerHTML+=`
+<div>
+${w}
+<input autocomplete="off">
+</div>
+`
+
+})
 
 }
 
-//////////////////////////////////////////////////
+function check(){
 
-function saveData(){
+const data=getData()
 
-localStorage.setItem("dictationData",JSON.stringify(data));
+const words=data[student].words
 
-}
+const inputs=document.querySelectorAll("input")
 
-//////////////////////////////////////////////////
+let correct=0
 
-function saveInstruction(){
+let detail=[]
 
-data.instruction=document.getElementById("instruction").value;
+inputs.forEach((input,i)=>{
 
-saveData();
+if(input.value.trim()===words[i]){
 
-alert("Сохранено");
+correct++
 
-}
-
-//////////////////////////////////////////////////
-
-function addStudent(){
-
-let name=document.getElementById("studentName").value.trim();
-
-let raw=document.getElementById("studentWords").value.trim();
-
-if(!name||!raw){
-
-alert("Введите имя и слова");
-
-return;
+detail.push("✔ "+words[i])
 
 }
-
-let words=[];
-
-raw.split("\n").forEach(line=>{
-
-let parts=line.split(":");
-
-if(parts.length==2){
-
-words.push({
-ru:parts[0].trim(),
-en:parts[1].trim()
-});
-
-}
-
-});
-
-data.students[name]=words;
-
-saveData();
-
-showStudents();
-
-alert("Ученик добавлен");
-
-}
-
-//////////////////////////////////////////////////
-
-function deleteStudent(name){
-
-if(!confirm("Удалить ученика?")) return;
-
-delete data.students[name];
-
-delete data.results[name];
-
-saveData();
-
-showStudents();
-
-}
-
-//////////////////////////////////////////////////
-
-function showStudents(){
-
-let html="";
-
-for(let name in data.students){
-
-html+=`<div class="studentBox">`;
-
-html+=`<h3>${name}</h3>`;
-
-html+=`<button onclick="deleteStudent('${name}')">Удалить</button>`;
-
-let results=data.results[name];
-
-if(results){
-
-results.attempts.forEach((a,i)=>{
-
-html+=`<p>Попытка ${i+1} — ${a.percent}% (${a.date})</p>`;
-
-html+=`<details>
-<summary>Детализация</summary>`;
-
-a.details.forEach(d=>{
-
-if(d.ok)
-html+=`<div class="correct">${d.ru} ✓</div>`;
-else
-html+=`<div class="wrong">${d.ru} ✗ (${d.correct})</div>`;
-
-});
-
-html+=`</details>`;
-
-});
-
-}else{
-
-html+=`<p>Нет попыток</p>`;
-
-}
-
-html+=`</div>`;
-
-}
-
-document.getElementById("students").innerHTML=html;
-
-}
-
-//////////////////////////////////////////////////
-
-let pass=prompt("Пароль");
-
-if(pass!="tutorai"){
-
-alert("Неверный пароль");
-
-location.href="index.html";
-
-}
-
 else{
 
-loadData();
+detail.push("✘ "+words[i]+" → "+input.value)
 
 }
 
-//////////////////////////////////////////////////
+})
+
+const percent=Math.round(correct/words.length*100)
+
+if(!data[student].attempts)
+data[student].attempts=[]
+
+data[student].attempts.push({
+percent,
+detail
+})
+
+saveData(data)
+
+document.getElementById("result").innerHTML=
+percent+"%<br>"+detail.join("<br>")
+
+}
+
+function retry(){
+
+load()
+
+document.getElementById("result").innerHTML=""
+
+}
+
+load()
 
 </script>
 
