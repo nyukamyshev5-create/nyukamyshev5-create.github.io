@@ -7,7 +7,6 @@
 <script src="config.js"></script>
 
 <style>
-
 body{
 font-family:Arial;
 padding:30px;
@@ -24,7 +23,7 @@ box-shadow:0 8px 25px rgba(0,0,0,0.1);
 }
 
 button{
-padding:6px 12px;
+padding:6px 10px;
 margin:5px;
 border:none;
 border-radius:6px;
@@ -37,7 +36,7 @@ button:hover{
 background:#2e59d9;
 }
 
-textarea,input,select{
+textarea,input{
 width:100%;
 margin:5px 0;
 padding:6px;
@@ -47,19 +46,15 @@ padding:6px;
 display:none;
 }
 
-.student{
-border:1px solid #ddd;
-padding:10px;
-margin:10px 0;
-border-radius:8px;
+.ok{
+color:green;
+font-weight:bold;
 }
 
-.result{
-background:#f8f9fc;
-padding:10px;
-margin-top:10px;
+.err{
+color:red;
+font-weight:bold;
 }
-
 </style>
 
 </head>
@@ -67,13 +62,14 @@ margin-top:10px;
 
 <div id="login" class="panel">
 
-<h2>Вход tutor</h2>
+<h2>Вход</h2>
 
-<input type="password" id="pass" placeholder="Пароль">
+<input type="password" id="pass" placeholder="Введите пароль">
 
 <button onclick="login()">Войти</button>
 
 </div>
+
 
 <div id="panel" class="panel hidden">
 
@@ -85,16 +81,17 @@ margin-top:10px;
 
 <hr>
 
-<h2>Добавить / изменить ученика</h2>
+<h2>Добавить ученика</h2>
 
-<input id="studentName" placeholder="Имя ученика">
+Имя:
+<input id="name">
 
-<textarea id="studentWords" rows="6" placeholder="формат:
-русское:english
-кот:cat
-дом:house"></textarea>
+Слова (формат: русский:english)
+<textarea id="words" rows="10"></textarea>
 
-<button onclick="saveStudent()">Сохранить ученика</button>
+<button onclick="add()">Добавить ученика</button>
+
+<p id="msg"></p>
 
 <hr>
 
@@ -104,16 +101,15 @@ margin-top:10px;
 
 </div>
 
+
+
 <script>
-
-const PASSWORD="tutorai"
-
-let data={}
-let sha=""
 
 function login(){
 
-if(document.getElementById("pass").value===PASSWORD){
+const entered=document.getElementById("pass").value
+
+if(entered===CONFIG.adminPassword){
 
 document.getElementById("login").classList.add("hidden")
 
@@ -121,49 +117,39 @@ document.getElementById("panel").classList.remove("hidden")
 
 load()
 
+}else{
+
+alert("Неверный пароль")
+
 }
 
 }
+
+
 
 async function load(){
 
-const res=await fetch(
-`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
-{
-headers:{Authorization:`Bearer ${CONFIG.token}`}
-})
+const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
 
 const json=await res.json()
 
-sha=json.sha
+const content=JSON.parse(atob(json.content))
 
-data=JSON.parse(atob(json.content))
+document.getElementById("instruction").value=content.instruction||""
 
-document.getElementById("instruction").value=data.instruction||""
-
-renderStudents()
+showStudents(content.students||{})
 
 }
 
-function renderStudents(){
+
+
+function showStudents(students){
 
 let html=""
 
-for(let name in data.students){
+for(let name in students){
 
-html+=`
-<div class="student">
-
-<b>${name}</b>
-
-<button onclick="editStudent('${name}')">редактировать</button>
-
-<button onclick="deleteStudent('${name}')">удалить</button>
-
-${renderResult(name)}
-
-</div>
-`
+html+=`<p>${name} <button onclick="remove('${name}')">Удалить</button></p>`
 
 }
 
@@ -171,67 +157,49 @@ document.getElementById("students").innerHTML=html
 
 }
 
-function renderResult(name){
 
-if(!data.results)return ""
 
-if(!data.results[name])return ""
+async function saveInstruction(){
 
-let r=data.results[name]
+const data=await getData()
 
-return `
-<div class="result">
-Результат: ${r.percent}%
-</div>
-`
+data.instruction=document.getElementById("instruction").value
+
+await saveData(data)
+
+showMsg("Сохранено")
 
 }
 
-function editStudent(name){
 
-document.getElementById("studentName").value=name
 
-let text=""
+async function add(){
 
-data.students[name].forEach(w=>{
+const name=document.getElementById("name").value.trim()
 
-text+=`${w.ru}:${w.en}\n`
+const raw=document.getElementById("words").value.trim()
 
-})
+if(!name||!raw){
 
-document.getElementById("studentWords").value=text
-
-}
-
-function deleteStudent(name){
-
-if(!confirm("Удалить ученика?"))return
-
-delete data.students[name]
-
-save()
+showMsg("Заполните всё",true)
+return
 
 }
 
-function saveStudent(){
-
-let name=document.getElementById("studentName").value.trim()
-
-let raw=document.getElementById("studentWords").value.trim()
-
-if(!name)return
+const lines=raw.split("\n")
 
 let words=[]
 
-raw.split("\n").forEach(line=>{
+lines.forEach(line=>{
 
-let parts=line.split(":")
+const parts=line.split(":")
 
-if(parts.length>=2){
+if(parts.length===2){
 
 words.push({
 
 ru:parts[0].trim(),
+
 en:parts[1].trim()
 
 })
@@ -240,38 +208,88 @@ en:parts[1].trim()
 
 })
 
+const data=await getData()
+
+if(!data.students) data.students={}
+
 data.students[name]=words
 
-save()
+await saveData(data)
+
+showMsg("Ученик добавлен")
+
+load()
 
 }
 
-function saveInstruction(){
 
-data.instruction=document.getElementById("instruction").value
 
-save()
+async function remove(name){
+
+const data=await getData()
+
+delete data.students[name]
+
+await saveData(data)
+
+showMsg("Удалено")
+
+load()
 
 }
 
-async function save(){
 
-await fetch(
-`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
-{
+
+async function getData(){
+
+const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
+
+const json=await res.json()
+
+return JSON.parse(atob(json.content))
+
+}
+
+
+
+async function saveData(data){
+
+const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
+
+const json=await res.json()
+
+await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,{
+
 method:"PUT",
+
 headers:{
 Authorization:`Bearer ${CONFIG.token}`,
 "Content-Type":"application/json"
 },
+
 body:JSON.stringify({
-message:"update data",
+
+message:"update",
+
 content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
-sha:sha
-})
+
+sha:json.sha
+
 })
 
-load()
+})
+
+}
+
+
+
+function showMsg(text,error){
+
+const el=document.getElementById("msg")
+
+el.innerText=text
+
+el.className=error?"err":"ok"
 
 }
 
