@@ -1,134 +1,189 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Тест</title>
+<title>Диктанты</title>
 
 <script src="config.js"></script>
 
 <style>
 body{
-    font-family: Arial;
-    background: linear-gradient(90deg,#4facfe,#43e97b);
-    margin:0;
+font-family:Arial;
+background:linear-gradient(135deg,#4e73df,#1cc88a);
+margin:0;
+padding:0;
+text-align:center;
 }
 
-#login, #test{
-    background:white;
-    width:400px;
-    margin:100px auto;
-    padding:20px;
-    border-radius:10px;
-    text-align:center;
+.container{
+background:white;
+max-width:700px;
+margin:40px auto;
+padding:30px;
+border-radius:15px;
+box-shadow:0 10px 30px rgba(0,0,0,0.2);
 }
 
 button{
-    padding:10px 20px;
-    font-size:16px;
+padding:10px;
+margin:5px;
 }
-
-#question{
-    font-size:22px;
-    margin:20px;
-}
-
-input{
-    padding:10px;
-    font-size:16px;
-    width:80%;
-}
+.correct{color:green;}
+.wrong{color:red;}
+#test{display:none;}
 </style>
 </head>
 <body>
 
-<div id="login">
-<h2>Введите имя</h2>
-<input id="name">
-<br><br>
-<button onclick="start()">Начать</button>
-<div id="error" style="color:red"></div>
+<div class="container">
+
+<h2>Выберите ученика</h2>
+<div id="studentsList"></div>
+
+<hr>
+
+<div id="test">
+
+<h3 id="studentTitle"></h3>
+<p id="instruction"></p>
+
+<div id="words"></div>
+
+<button onclick="send()">Отправить</button>
+
+<div id="result"></div>
+
 </div>
 
-<div id="test" style="display:none">
-<div id="question"></div>
-<input id="answer">
-<br><br>
-<button onclick="check()">Ответить</button>
-<div id="result"></div>
 </div>
 
 <script>
 
-let words = []
-let current = null
+let words=[]
+let currentStudent=""
+let sha=""
 
 async function loadData(){
 
-const url =
-`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}?ref=${CONFIG.branch}`
-
-const res = await fetch(url,{
-headers:{
-Authorization:`Bearer ${CONFIG.token}`
-}
+const res=await fetch(
+`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+{
+headers:{Authorization:`Bearer ${CONFIG.token}`}
 })
 
-const json = await res.json()
+const json=await res.json()
 
-const content = JSON.parse(atob(json.content))
+sha=json.sha
 
-return content
+return JSON.parse(atob(json.content))
+
 }
 
-async function start(){
+async function loadStudents(){
 
-const name = document.getElementById("name").value.trim()
+const data=await loadData()
 
-if(!name)return
+let html=""
 
-const data = await loadData()
+for(let name in data.students){
 
-if(!data.students[name]){
-document.getElementById("error").innerText="Ученик не найден"
-return
+html+=`<button onclick="startTest('${name}')">${name}</button>`
+
 }
 
-words = data.students[name]
+document.getElementById("studentsList").innerHTML=html
 
-document.getElementById("login").style.display="none"
+}
+
+async function startTest(name){
+
+currentStudent=name
+
+const data=await loadData()
+
+words=data.students[name]
+
+document.getElementById("studentTitle").innerText=name
+document.getElementById("instruction").innerText=data.instruction
+
+let html=""
+
+words.forEach((w,i)=>{
+
+html+=`${w.ru}<input id="w${i}"><br>`
+
+})
+
+document.getElementById("words").innerHTML=html
+
 document.getElementById("test").style.display="block"
 
-next()
 }
 
-function next(){
+async function send(){
 
-current = words[Math.floor(Math.random()*words.length)]
+let correct=0
+let details=[]
 
-document.getElementById("question").innerText=current.en
+words.forEach((w,i)=>{
 
-document.getElementById("answer").value=""
-document.getElementById("result").innerText=""
+let val=document.getElementById("w"+i).value.trim()
+
+let ok=val.toLowerCase()==w.en.toLowerCase()
+
+if(ok)correct++
+
+details.push({
+ru:w.ru,
+correct:w.en,
+answer:val,
+ok:ok
+})
+
+})
+
+let percent=Math.round(correct/words.length*100)
+
+let grade=2
+
+if(percent>=90)grade=5
+else if(percent>=80)grade=4
+else if(percent>=70)grade=3
+
+let html=`<h2>${percent}%</h2><h2>Оценка ${grade}</h2>`
+
+document.getElementById("result").innerHTML=html
+
+saveResult(percent,details)
+
 }
 
-function check(){
+async function saveResult(percent,details){
 
-const answer =
-document.getElementById("answer").value.trim().toLowerCase()
+let data=await loadData()
 
-if(answer==current.ru.toLowerCase()){
+if(!data.results)data.results={}
 
-document.getElementById("result").innerHTML="✅ Правильно"
+data.results[currentStudent]={percent,details}
+
+await fetch(
+`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
+{
+method:"PUT",
+headers:{
+Authorization:`Bearer ${CONFIG.token}`,
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+message:"update result",
+content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
+sha:sha
+})
+})
+
 }
-else{
 
-document.getElementById("result").innerHTML=
-"❌ Правильно: "+current.ru
-}
-
-setTimeout(next,1000)
-
-}
+loadStudents()
 
 </script>
 
