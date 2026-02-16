@@ -1,407 +1,774 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ru">
 <head>
-<meta charset="UTF-8">
-<title>Диктанты</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Диктанты</title>
 
-<style>
-body{
- font-family:Arial;
- background:linear-gradient(135deg,#4e73df,#1cc88a);
- margin:0;
- padding:20px;
-}
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-.panel{
- background:white;
- padding:20px;
- border-radius:12px;
- max-width:900px;
- margin:auto;
- margin-bottom:20px;
- box-shadow:0 8px 25px rgba(0,0,0,0.15);
-}
-
-button{
- padding:8px 14px;
- margin:5px;
- border:none;
- border-radius:8px;
- background:#4e73df;
- color:white;
- cursor:pointer;
-}
-
-button:hover{
- background:#2e59d9;
-}
-
-input,textarea{
- width:100%;
- padding:6px;
- margin:5px 0;
-}
-
-.hidden{
- display:none;
-}
-
-.correct{color:green;}
-.wrong{color:red;}
-</style>
-
+  <style>
+    body{
+      font-family:Arial, sans-serif;
+      background:linear-gradient(135deg,#4e73df,#1cc88a);
+      margin:0; padding:0;
+      text-align:center;
+      color:#111;
+    }
+    .container{
+      background:#fff;
+      max-width:920px;
+      margin:30px auto;
+      padding:24px;
+      border-radius:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,0.2);
+      text-align:left;
+    }
+    h2,h3{margin:10px 0 12px;}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+    .right{margin-left:auto;}
+    button{
+      padding:10px 14px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      background:#4e73df;
+      color:#fff;
+      font-weight:600;
+    }
+    button:hover{background:#2e59d9;}
+    button.secondary{background:#6c757d;}
+    button.danger{background:#dc3545;}
+    button.ok{background:#198754;}
+    .pill{display:inline-block; padding:6px 10px; border-radius:999px; background:#f1f3f5; margin:4px 6px 0 0;}
+    .muted{color:#666; font-size:13px;}
+    .panel{
+      border:1px solid #e6e6e6;
+      border-radius:14px;
+      padding:16px;
+      margin-top:14px;
+      background:#fff;
+    }
+    input, textarea{
+      width:100%;
+      padding:10px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      font-size:15px;
+      box-sizing:border-box;
+    }
+    textarea{min-height:120px; resize:vertical;}
+    hr{border:none; border-top:1px solid #eee; margin:14px 0;}
+    .hidden{display:none !important;}
+    .studentBtn{margin:4px 6px 0 0;}
+    .wordRow{
+      display:flex; gap:10px; align-items:center;
+      margin:8px 0;
+    }
+    .wordRow .ru{width:42%; text-align:right;}
+    .wordRow input{width:58%;}
+    .correct{color:#198754; font-weight:700;}
+    .wrong{color:#dc3545; font-weight:700;}
+    .resultBox{
+      margin-top:12px;
+      border-top:1px dashed #ddd;
+      padding-top:12px;
+    }
+    .attemptCard{
+      border:1px solid #eee;
+      border-radius:12px;
+      padding:12px;
+      margin:10px 0;
+      background:#fafafa;
+      text-align:left;
+    }
+    .smallBtn{padding:7px 10px; border-radius:9px; font-size:13px;}
+    .notice{padding:10px; border-radius:12px; background:#fff3cd; border:1px solid #ffeeba;}
+  </style>
 </head>
+
 <body>
+  <div class="container">
+    <div class="row">
+      <h2 style="margin-right:auto;">Диктанты</h2>
+      <button id="teacherToggleBtn" class="secondary">Вход для учителя</button>
+    </div>
 
-<div class="panel">
+    <!-- УЧЕНИКИ -->
+    <div class="panel">
+      <h3>Выберите ученика</h3>
+      <div id="studentsList" class="row" style="gap:6px;"></div>
+      <div id="studentsEmpty" class="muted hidden">Пока нет учеников. Зайди как учитель и добавь.</div>
+    </div>
 
-<h2>Выберите ученика</h2>
-<div id="studentsList"></div>
+    <!-- ТЕСТ -->
+    <div id="testPanel" class="panel hidden">
+      <div class="row">
+        <h3 id="studentTitle">Ученик:</h3>
+        <button id="newAttemptBtn" class="secondary right">Начать новую попытку</button>
+      </div>
 
-<button onclick="showTutorLogin()">Вход для учителя</button>
+      <div class="panel" style="background:#fbfbfb;">
+        <div id="instruction" style="white-space:pre-wrap;"></div>
+        <hr>
+        <b>Шкала оценок:</b><br>
+        90–100% → 5<br>
+        80–89% → 4<br>
+        70–79% → 3<br>
+        ниже 70% → 2
+      </div>
 
-</div>
+      <hr>
+      <form id="studentForm" autocomplete="off">
+        <div id="words"></div>
+        <div class="row" style="margin-top:10px;">
+          <button type="button" id="sendBtn">Отправить</button>
+        </div>
+      </form>
 
+      <div id="result" class="resultBox"></div>
+    </div>
 
-<div id="testPanel" class="panel hidden">
+    <!-- УЧИТЕЛЬ -->
+    <div id="teacherPanel" class="panel hidden">
+      <h3>Личный кабинет учителя</h3>
 
-<h3 id="studentName"></h3>
-<p id="instruction"></p>
+      <div id="loginBox">
+        <div class="row">
+          <div style="flex:1;">
+            <label><b>Пароль учителя</b></label>
+            <input id="teacherPass" type="password" placeholder="tutorai"
+                   autocomplete="new-password" autocapitalize="off" spellcheck="false">
+          </div>
+          <div style="width:140px; align-self:flex-end;">
+            <button id="teacherLoginBtn">Войти</button>
+          </div>
+        </div>
+        <div id="loginMsg" class="muted" style="margin-top:8px;"></div>
+      </div>
 
-<div id="words"></div>
+      <div id="teacherBox" class="hidden">
+        <div class="notice">
+          Важно: вставка/копирование блокируются <b>только у ученика</b>. В кабинете учителя Ctrl+V работает.
+        </div>
 
-<button onclick="finishTest()">Отправить</button>
+        <hr>
 
-<div id="result"></div>
+        <h3>Инструкция (общая)</h3>
+        <textarea id="tInstruction" rows="5" placeholder="Инструкция для всех учеников..."></textarea>
+        <div class="row">
+          <button id="saveInstructionBtn" class="ok">Сохранить инструкцию</button>
+          <span id="instrMsg" class="muted"></span>
+        </div>
 
-</div>
+        <hr>
 
+        <h3>Создать / обновить диктант ученика</h3>
+        <div class="row">
+          <div style="flex:1;">
+            <label><b>Имя ученика</b></label>
+            <input id="tStudentName" placeholder="Например: Ксения" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
 
-<div id="tutorLogin" class="panel hidden">
+        <label style="display:block;margin-top:8px;"><b>Слова</b> <span class="muted">(формат: русское = english или русское:english)</span></label>
+        <textarea id="tWords" placeholder="долгосрочный спад = long-term decline&#10;десятилетие = decade&#10;be = was,were,been"></textarea>
 
-<h3>Пароль учителя</h3>
+        <div class="row">
+          <button id="saveStudentBtn" class="ok">Сохранить ученика</button>
+          <button id="clearFormBtn" class="secondary">Очистить поля</button>
+          <span id="studentMsg" class="muted"></span>
+        </div>
 
-<input type="password" id="tutorPass">
-<button onclick="loginTutor()">Войти</button>
+        <hr>
 
-</div>
+        <h3>Ученики</h3>
+        <div id="teacherStudents"></div>
 
+        <hr>
 
-<div id="tutorPanel" class="panel hidden">
-
-<h3>Инструкция</h3>
-
-<textarea id="instructionEdit"></textarea>
-
-<button onclick="saveInstruction()">Сохранить инструкцию</button>
-
-<hr>
-
-<h3>Добавить ученика</h3>
-
-<input id="studentNameInput" placeholder="Имя">
-
-<textarea id="studentWordsInput"
-placeholder="кот:cat
-дом:house"></textarea>
-
-<button onclick="addStudent()">Сохранить ученика</button>
-
-<hr>
-
-<h3>Ученики</h3>
-
-<div id="studentsEdit"></div>
-
-<hr>
-
-<h3>Результаты</h3>
-
-<div id="results"></div>
-
-</div>
-
+        <h3>Результаты</h3>
+        <div class="muted">Нажми “Попытки” рядом с учеником — увидишь все попытки и детализацию каждой попытки.</div>
+        <div id="resultsBox"></div>
+      </div>
+    </div>
+  </div>
 
 <script>
+/** ======================
+ *  НАСТРОЙКИ SUPABASE
+ *  ====================== */
+const SUPABASE_URL = "https://fbpetpkozxvftrhymade.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_IL-eG_ifkskxSMPa2NtnQg_obuFuar9"; // твой ключ
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const BIN_ID="698f3a3043b1c97be97c510c ";
-const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
+/** ======================
+ *  ПАРОЛЬ УЧИТЕЛЯ
+ *  ====================== */
+const TEACHER_PASSWORD = "tutorai";
 
-const PASSWORD="tutorai";
+/** ======================
+ *  ГЛОБАЛЫ
+ *  ====================== */
+let currentStudent = "";
+let currentItems = [];
+let teacherMode = false;
 
-let data={};
-let currentStudent="";
-let words=[];
+/** ======================
+ *  УТИЛИТЫ
+ *  ====================== */
+function normalizeAnswer(s){
+  return (s || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
 
+function calcGrade(percent){
+  if (percent >= 90) return 5;
+  if (percent >= 80) return 4;
+  if (percent >= 70) return 3;
+  return 2;
+}
 
+function escapeHtml(str){
+  return (str ?? "").toString()
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
+}
 
-async function loadData(){
-
- let res=await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,{
-  headers:{
-   "X-Master-Key":API_KEY
+/** Парсер строк слов:
+ * принимает:
+ *  "кот:cat"
+ *  "кот = cat"
+ *  "be = was,were,been"
+ */
+function parseWords(text){
+  const lines = (text || "").split("\n").map(l => l.trim()).filter(Boolean);
+  const items = [];
+  for (const line of lines){
+    // допускаем " = " или ":" или "="
+    let m = line.match(/^(.+?)\s*(?:=|:)\s*(.+)$/);
+    if (!m) continue;
+    const ru = m[1].trim();
+    const en = m[2].trim();
+    if (!ru || !en) continue;
+    items.push({ ru, en });
   }
- });
-
- let json=await res.json();
-
- data=json.record;
-
- if(!data.students) data.students={};
- if(!data.results) data.results={};
-
- showStudents();
- showTutorStudents();
- showResults();
-
+  return items;
 }
 
+/** ======================
+ *  ЗАГРУЗКА ДАННЫХ
+ *  ====================== */
+async function loadStudentsButtons(){
+  const { data, error } = await supabase
+    .from("dictations")
+    .select("student_name")
+    .order("student_name", { ascending:true });
 
+  const list = document.getElementById("studentsList");
+  const empty = document.getElementById("studentsEmpty");
+  list.innerHTML = "";
 
-function showStudents(){
+  if (error){
+    empty.classList.remove("hidden");
+    empty.textContent = "Ошибка загрузки учеников: " + error.message;
+    return;
+  }
 
- let html="";
+  if (!data || data.length === 0){
+    empty.classList.remove("hidden");
+    return;
+  }
+  empty.classList.add("hidden");
 
- for(let name in data.students){
-
-  html+=`<button onclick="startTest('${name}')">${name}</button>`;
-
- }
-
- document.getElementById("studentsList").innerHTML=html;
-
+  data.forEach(row => {
+    const btn = document.createElement("button");
+    btn.className = "studentBtn";
+    btn.textContent = row.student_name;
+    btn.onclick = () => startTest(row.student_name);
+    list.appendChild(btn);
+  });
 }
 
+async function loadInstruction(){
+  // Инструкция хранится в отдельном "псевдо-ученике" __global__
+  const { data } = await supabase
+    .from("dictations")
+    .select("instruction")
+    .eq("student_name", "__global__")
+    .maybeSingle();
 
-
-function startTest(name){
-
- currentStudent=name;
-
- words=data.students[name];
-
- document.getElementById("studentName").innerText=name;
-
- document.getElementById("instruction").innerText=data.instruction;
-
- let html="";
-
- words.forEach((w,i)=>{
-
-  html+=`${w.ru}<input id="w${i}"><br>`;
-
- });
-
- document.getElementById("words").innerHTML=html;
-
- document.getElementById("testPanel").classList.remove("hidden");
-
+  return data?.instruction || "";
 }
 
+async function saveGlobalInstruction(text){
+  // upsert __global__
+  const { error } = await supabase
+    .from("dictations")
+    .upsert({
+      student_name: "__global__",
+      instruction: text || "",
+      items: [],
+      updated_at: new Date().toISOString()
+    }, { onConflict: "student_name" });
 
+  return error;
+}
 
-async function finishTest(){
+/** ======================
+ *  СТУДЕНТ: ТЕСТ
+ *  ====================== */
+async function startTest(name){
+  currentStudent = name;
 
- let correct=0;
- let details=[];
+  // грузим диктант ученика
+  const { data, error } = await supabase
+    .from("dictations")
+    .select("student_name, instruction, items")
+    .eq("student_name", name)
+    .single();
 
- words.forEach((w,i)=>{
+  if (error){
+    alert("Не удалось загрузить диктант: " + error.message);
+    return;
+  }
 
-  let val=document.getElementById("w"+i).value.trim();
+  // общая инструкция (из __global__) + можно добавить индивидуальную (data.instruction)
+  const globalInstr = await loadInstruction();
+  const mergedInstr = [globalInstr, data.instruction].filter(Boolean).join("\n");
 
-  let ok=val.toLowerCase()==w.en.toLowerCase();
+  currentItems = Array.isArray(data.items) ? data.items : [];
 
-  if(ok) correct++;
+  document.getElementById("studentTitle").textContent = "Ученик: " + name;
+  document.getElementById("instruction").textContent = mergedInstr || "";
 
-  details.push({
-   ru:w.ru,
-   correct:w.en,
-   answer:val,
-   ok:ok
+  renderWords(currentItems);
+
+  document.getElementById("result").innerHTML = "";
+  document.getElementById("testPanel").classList.remove("hidden");
+
+  // включаем анти-чит ТОЛЬКО в режиме ученика
+  setStudentRestrictions(true);
+}
+
+function renderWords(items){
+  const wrap = document.getElementById("words");
+  wrap.innerHTML = "";
+
+  // форма: autocomplete off + хаки против автозаполнения
+  // 1) создаем новый hidden input для сбивания автозаполнения
+  const bait = document.createElement("input");
+  bait.type = "text";
+  bait.style.position = "absolute";
+  bait.style.left = "-9999px";
+  bait.autocomplete = "username";
+  wrap.appendChild(bait);
+
+  items.forEach((w, i) => {
+    const row = document.createElement("div");
+    row.className = "wordRow";
+    row.innerHTML = `
+      <div class="ru">${escapeHtml(w.ru)}</div>
+      <input
+        id="w${i}"
+        type="text"
+        inputmode="text"
+        autocapitalize="off"
+        spellcheck="false"
+        autocomplete="off"
+      />
+    `;
+    wrap.appendChild(row);
+
+    const inp = row.querySelector("input");
+
+    // анти-автозаполнение (не 100% во всех браузерах, но максимально)
+    // делаем readonly, снимаем при фокусе
+    inp.readOnly = true;
+    inp.addEventListener("focus", () => { inp.readOnly = false; });
+
+    // уникальные name, чтобы браузер не подсовывал прошлое
+    inp.name = "ans_" + i + "_" + Math.random().toString(16).slice(2);
+  });
+}
+
+async function submitAttempt(){
+  if (!currentStudent || !currentItems.length){
+    alert("Нет слов для теста.");
+    return;
+  }
+
+  let correct = 0;
+  const details = [];
+
+  currentItems.forEach((w, i) => {
+    const inp = document.getElementById("w" + i);
+    const val = (inp?.value || "").trim();
+    const ok = normalizeAnswer(val) === normalizeAnswer(w.en);
+    if (ok) correct++;
+
+    details.push({
+      ru: w.ru,
+      correct: w.en,
+      answer: val,
+      ok
+    });
   });
 
- });
+  const percent = Math.round((correct / currentItems.length) * 100);
+  const grade = calcGrade(percent);
 
- let percent=Math.round(correct/words.length*100);
+  // рисуем результат для ученика (детализация каждой попытки)
+  let html = `<h3>Результат: ${percent}% • Оценка: ${grade}</h3><hr>`;
+  details.forEach(d => {
+    if (d.ok){
+      html += `<div class="correct">✅ ${escapeHtml(d.ru)} → ${escapeHtml(d.answer)}</div>`;
+    } else {
+      html += `<div class="wrong">❌ ${escapeHtml(d.ru)} → ${escapeHtml(d.answer || "(пусто)")} — ошибка (правильно: <b>${escapeHtml(d.correct)}</b>)</div>`;
+    }
+  });
+  document.getElementById("result").innerHTML = html;
 
- if(!data.results[currentStudent])
-  data.results[currentStudent]=[];
+  // вычисляем номер попытки
+  const { data: maxRow } = await supabase
+    .from("attempts")
+    .select("attempt_no")
+    .eq("student_name", currentStudent)
+    .order("attempt_no", { ascending:false })
+    .limit(1);
 
- data.results[currentStudent].push({
-  percent:percent,
-  date:new Date().toLocaleString()
- });
+  const last = (maxRow && maxRow[0]) ? maxRow[0].attempt_no : 0;
+  const attemptNo = last + 1;
 
- await saveData();
+  const { error } = await supabase.from("attempts").insert({
+    student_name: currentStudent,
+    attempt_no: attemptNo,
+    percent,
+    grade,
+    details
+  });
 
- let html=`<h3>Результат: ${percent}%</h3>`;
-
- details.forEach(d=>{
-
-  if(d.ok)
-   html+=`<div class="correct">${d.ru} ✓</div>`;
-  else
-   html+=`<div class="wrong">${d.ru} ✗ (${d.correct})</div>`;
-
- });
-
- document.getElementById("result").innerHTML=html;
-
- showResults();
-
+  if (error){
+    alert("Не удалось сохранить попытку: " + error.message);
+  }
 }
 
-
-
-function showTutorLogin(){
-
- document.getElementById("tutorLogin").classList.remove("hidden");
-
+function newAttempt(){
+  // очищаем инпуты и результат
+  currentItems.forEach((_, i) => {
+    const inp = document.getElementById("w" + i);
+    if (inp) inp.value = "";
+  });
+  document.getElementById("result").innerHTML = "";
+  // снова включаем readonly хак
+  currentItems.forEach((_, i) => {
+    const inp = document.getElementById("w" + i);
+    if (inp){
+      inp.readOnly = true;
+      inp.blur();
+    }
+  });
 }
 
+/** ======================
+ *  АНТИ-ЧИТ ДЛЯ УЧЕНИКА
+ *  (копирование/вставка/контекстное меню)
+ *  ====================== */
+function setStudentRestrictions(on){
+  const form = document.getElementById("studentForm");
+  if (!form) return;
 
+  // снимем старые (на всякий)
+  form.oncopy = null;
+  form.oncut = null;
+  form.onpaste = null;
+  form.ondrop = null;
+  form.ondragover = null;
+  document.oncontextmenu = null;
+  document.onkeydown = null;
 
-function loginTutor(){
+  if (!on) return;
 
- if(document.getElementById("tutorPass").value!=PASSWORD){
+  // блокируем мышь
+  form.oncopy = (e) => e.preventDefault();
+  form.oncut = (e) => e.preventDefault();
+  form.onpaste = (e) => e.preventDefault();
+  form.ondrop = (e) => e.preventDefault();
+  form.ondragover = (e) => e.preventDefault();
+  document.oncontextmenu = (e) => {
+    // запрет правой кнопки только когда виден тест
+    if (!document.getElementById("testPanel").classList.contains("hidden")) e.preventDefault();
+  };
 
-  alert("Неверный пароль");
-  return;
+  // блокируем Ctrl+V / Cmd+V / Ctrl+C / Ctrl+X
+  document.onkeydown = (e) => {
+    const testVisible = !document.getElementById("testPanel").classList.contains("hidden");
+    if (!testVisible) return;
 
- }
+    const key = (e.key || "").toLowerCase();
+    const ctrl = e.ctrlKey || e.metaKey;
 
- document.getElementById("tutorPanel").classList.remove("hidden");
-
- document.getElementById("instructionEdit").value=data.instruction;
-
+    if (ctrl && (key === "v" || key === "c" || key === "x" || key === "a")) {
+      e.preventDefault();
+    }
+  };
 }
 
-
-
-async function saveInstruction(){
-
- data.instruction=document.getElementById("instructionEdit").value;
-
- await saveData();
-
- alert("Сохранено");
-
+/** ======================
+ *  УЧИТЕЛЬ: UI
+ *  ====================== */
+function toggleTeacherPanel(){
+  const p = document.getElementById("teacherPanel");
+  p.classList.toggle("hidden");
+  // когда учитель открыт — выключаем ограничения ученика (чтобы у учителя Ctrl+V работал)
+  if (!p.classList.contains("hidden")) {
+    setStudentRestrictions(false);
+  }
 }
 
+function teacherLogin(){
+  const pass = document.getElementById("teacherPass").value;
+  const msg = document.getElementById("loginMsg");
 
+  if (pass !== TEACHER_PASSWORD){
+    msg.textContent = "Неверный пароль.";
+    return;
+  }
+  msg.textContent = "";
+  teacherMode = true;
 
-async function addStudent(){
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("teacherBox").classList.remove("hidden");
 
- let name=document.getElementById("studentNameInput").value.trim();
-
- let raw=document.getElementById("studentWordsInput").value.split("\n");
-
- let arr=[];
-
- raw.forEach(line=>{
-
-  let parts=line.split(":");
-
-  if(parts.length==2)
-   arr.push({
-    ru:parts[0].trim(),
-    en:parts[1].trim()
-   });
-
- });
-
- data.students[name]=arr;
-
- await saveData();
-
- showStudents();
- showTutorStudents();
-
- alert("Сохранено");
-
+  initTeacherData();
 }
 
+async function initTeacherData(){
+  // загрузим глобальную инструкцию
+  document.getElementById("tInstruction").value = await loadInstruction();
 
-
-function showTutorStudents(){
-
- let html="";
-
- for(let name in data.students){
-
-  html+=`
-   ${name}
-   <button onclick="deleteStudent('${name}')">Удалить</button>
-   <br>
-  `;
-
- }
-
- document.getElementById("studentsEdit").innerHTML=html;
-
+  await renderTeacherStudents();
 }
 
+async function renderTeacherStudents(){
+  const box = document.getElementById("teacherStudents");
+  box.innerHTML = "";
 
+  const { data, error } = await supabase
+    .from("dictations")
+    .select("student_name, updated_at")
+    .neq("student_name", "__global__")
+    .order("student_name", { ascending:true });
+
+  if (error){
+    box.innerHTML = `<div class="muted">Ошибка: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+
+  if (!data || data.length === 0){
+    box.innerHTML = `<div class="muted">Пока нет учеников.</div>`;
+    return;
+  }
+
+  data.forEach(row => {
+    const wrap = document.createElement("div");
+    wrap.className = "attemptCard";
+
+    wrap.innerHTML = `
+      <div class="row">
+        <div><b>${escapeHtml(row.student_name)}</b></div>
+        <div class="right muted">обновлён: ${new Date(row.updated_at).toLocaleString()}</div>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <button class="smallBtn" data-act="edit">Редактировать</button>
+        <button class="smallBtn" data-act="attempts">Попытки</button>
+        <button class="smallBtn danger" data-act="delete">Удалить</button>
+      </div>
+    `;
+
+    wrap.querySelector('[data-act="edit"]').onclick = () => loadStudentIntoForm(row.student_name);
+    wrap.querySelector('[data-act="attempts"]').onclick = () => showAttempts(row.student_name);
+    wrap.querySelector('[data-act="delete"]').onclick = () => deleteStudent(row.student_name);
+
+    box.appendChild(wrap);
+  });
+}
+
+async function saveInstructionTeacher(){
+  const text = document.getElementById("tInstruction").value || "";
+  const msg = document.getElementById("instrMsg");
+  msg.textContent = "Сохранение...";
+
+  const err = await saveGlobalInstruction(text);
+  if (err){
+    msg.textContent = "Ошибка: " + err.message;
+    return;
+  }
+  msg.textContent = "✅ Сохранено";
+
+  // чтобы ученики сразу видели обновление
+  await loadStudentsButtons();
+}
+
+async function saveOrUpdateStudent(){
+  const name = (document.getElementById("tStudentName").value || "").trim();
+  const wordsText = document.getElementById("tWords").value || "";
+  const msg = document.getElementById("studentMsg");
+
+  msg.textContent = "";
+
+  if (!name){
+    msg.textContent = "Введите имя ученика.";
+    return;
+  }
+
+  const items = parseWords(wordsText);
+  if (items.length === 0){
+    msg.textContent = "Не вижу слов. Пример: отчёт = report";
+    return;
+  }
+
+  msg.textContent = "Сохранение...";
+
+  const { error } = await supabase.from("dictations").upsert({
+    student_name: name,
+    instruction: "", // индивидуальную инструкцию можно добавить позже, пока оставим пустую
+    items: items,
+    updated_at: new Date().toISOString()
+  }, { onConflict: "student_name" });
+
+  if (error){
+    msg.textContent = "Ошибка: " + error.message;
+    return;
+  }
+
+  msg.textContent = "✅ Сохранено";
+  document.getElementById("tStudentName").value = "";
+  document.getElementById("tWords").value = "";
+
+  await loadStudentsButtons();
+  await renderTeacherStudents();
+}
+
+function clearTeacherForm(){
+  document.getElementById("tStudentName").value = "";
+  document.getElementById("tWords").value = "";
+  document.getElementById("studentMsg").textContent = "";
+}
+
+async function loadStudentIntoForm(name){
+  const { data, error } = await supabase
+    .from("dictations")
+    .select("student_name, items")
+    .eq("student_name", name)
+    .single();
+
+  if (error){
+    alert("Ошибка: " + error.message);
+    return;
+  }
+
+  document.getElementById("tStudentName").value = data.student_name;
+
+  const items = Array.isArray(data.items) ? data.items : [];
+  const text = items.map(it => `${it.ru} = ${it.en}`).join("\n");
+  document.getElementById("tWords").value = text;
+
+  document.getElementById("studentMsg").textContent = "Загружено для редактирования.";
+}
 
 async function deleteStudent(name){
+  if (!confirm(`Удалить ученика "${name}" и все его попытки?`)) return;
 
- delete data.students[name];
+  const { error: e1 } = await supabase.from("attempts").delete().eq("student_name", name);
+  const { error: e2 } = await supabase.from("dictations").delete().eq("student_name", name);
 
- await saveData();
+  if (e1 || e2){
+    alert("Ошибка удаления: " + (e1?.message || e2?.message));
+    return;
+  }
 
- showStudents();
- showTutorStudents();
+  // очистим результаты, если смотрели этого ученика
+  document.getElementById("resultsBox").innerHTML = "";
 
+  await loadStudentsButtons();
+  await renderTeacherStudents();
 }
 
+async function showAttempts(name){
+  const box = document.getElementById("resultsBox");
+  box.innerHTML = `<div class="muted">Загрузка попыток для ${escapeHtml(name)}...</div>`;
 
+  const { data, error } = await supabase
+    .from("attempts")
+    .select("attempt_no, percent, grade, details, created_at")
+    .eq("student_name", name)
+    .order("attempt_no", { ascending:true });
 
-function showResults(){
+  if (error){
+    box.innerHTML = `<div class="muted">Ошибка: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
 
- let html="";
+  if (!data || data.length === 0){
+    box.innerHTML = `<div class="attemptCard"><b>${escapeHtml(name)}</b><div class="muted">Нет попыток.</div></div>`;
+    return;
+  }
 
- for(let name in data.results){
+  let html = `<div class="attemptCard"><b>${escapeHtml(name)}</b><div class="muted">Всего попыток: ${data.length}</div></div>`;
 
-  html+=`<b>${name}</b><br>`;
-
-  data.results[name].forEach(r=>{
-
-   html+=`${r.percent}% (${r.date})<br>`;
-
+  data.forEach(a => {
+    html += `
+      <div class="attemptCard">
+        <div class="row">
+          <div><b>Попытка ${a.attempt_no}</b></div>
+          <div class="right muted">${new Date(a.created_at).toLocaleString()}</div>
+        </div>
+        <div style="margin-top:6px;">Итог: <b>${a.percent}%</b> • Оценка: <b>${a.grade}</b></div>
+        <hr>
+        <div>
+          ${(Array.isArray(a.details) ? a.details : []).map(d => {
+            if (d.ok){
+              return `<div class="correct">✅ ${escapeHtml(d.ru)} → ${escapeHtml(d.answer || "")}</div>`;
+            }
+            return `<div class="wrong">❌ ${escapeHtml(d.ru)} → ${escapeHtml(d.answer || "(пусто)")} — ошибка (правильно: <b>${escapeHtml(d.correct)}</b>)</div>`;
+          }).join("")}
+        </div>
+      </div>
+    `;
   });
 
-  html+="<br>";
-
- }
-
- document.getElementById("results").innerHTML=html;
-
+  box.innerHTML = html;
 }
 
+/** ======================
+ *  СОБЫТИЯ
+ *  ====================== */
+document.getElementById("teacherToggleBtn").addEventListener("click", toggleTeacherPanel);
+document.getElementById("teacherLoginBtn").addEventListener("click", teacherLogin);
 
+document.getElementById("saveInstructionBtn").addEventListener("click", saveInstructionTeacher);
+document.getElementById("saveStudentBtn").addEventListener("click", saveOrUpdateStudent);
+document.getElementById("clearFormBtn").addEventListener("click", clearTeacherForm);
 
-async function saveData(){
+document.getElementById("sendBtn").addEventListener("click", submitAttempt);
+document.getElementById("newAttemptBtn").addEventListener("click", newAttempt);
 
- await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
+/** ======================
+ *  СТАРТ
+ *  ====================== */
+(async function init(){
+  await loadStudentsButtons();
 
-  method:"PUT",
-
-  headers:{
-   "Content-Type":"application/json",
-   "X-Master-Key":API_KEY
-  },
-
-  body:JSON.stringify(data)
-
- });
-
-}
-
-
-
-loadData();
-
+  // по умолчанию НЕ блокируем копирование, пока тест не открыт
+  setStudentRestrictions(false);
+})();
 </script>
-
 </body>
 </html>
