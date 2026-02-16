@@ -6,216 +6,400 @@
 
 <style>
 body{
-font-family:Arial;
-background:linear-gradient(135deg,#4e73df,#1cc88a);
-text-align:center;
-margin:0;
-padding:0;
+ font-family:Arial;
+ background:linear-gradient(135deg,#4e73df,#1cc88a);
+ margin:0;
+ padding:20px;
 }
 
-.container{
-background:white;
-max-width:700px;
-margin:40px auto;
-padding:30px;
-border-radius:15px;
-box-shadow:0 10px 30px rgba(0,0,0,0.2);
+.panel{
+ background:white;
+ padding:20px;
+ border-radius:12px;
+ max-width:900px;
+ margin:auto;
+ margin-bottom:20px;
+ box-shadow:0 8px 25px rgba(0,0,0,0.15);
 }
 
 button{
-padding:10px;
-margin:5px;
-border:none;
-border-radius:8px;
-background:#4e73df;
-color:white;
-cursor:pointer;
+ padding:8px 14px;
+ margin:5px;
+ border:none;
+ border-radius:8px;
+ background:#4e73df;
+ color:white;
+ cursor:pointer;
+}
+
+button:hover{
+ background:#2e59d9;
+}
+
+input,textarea{
+ width:100%;
+ padding:6px;
+ margin:5px 0;
+}
+
+.hidden{
+ display:none;
 }
 
 .correct{color:green;}
 .wrong{color:red;}
-
-#test{display:none;}
 </style>
+
 </head>
 <body>
 
-<div class="container">
+<div class="panel">
 
 <h2>Выберите ученика</h2>
+<div id="studentsList"></div>
 
-<div id="students"></div>
+<button onclick="showTutorLogin()">Вход для учителя</button>
 
-<hr>
+</div>
 
-<div id="test">
+
+<div id="testPanel" class="panel hidden">
 
 <h3 id="studentName"></h3>
-
 <p id="instruction"></p>
 
 <div id="words"></div>
 
-<button onclick="finish()">Отправить</button>
+<button onclick="finishTest()">Отправить</button>
 
 <div id="result"></div>
 
 </div>
 
+
+<div id="tutorLogin" class="panel hidden">
+
+<h3>Пароль учителя</h3>
+
+<input type="password" id="tutorPass">
+<button onclick="loginTutor()">Войти</button>
+
 </div>
+
+
+<div id="tutorPanel" class="panel hidden">
+
+<h3>Инструкция</h3>
+
+<textarea id="instructionEdit"></textarea>
+
+<button onclick="saveInstruction()">Сохранить инструкцию</button>
+
+<hr>
+
+<h3>Добавить ученика</h3>
+
+<input id="studentNameInput" placeholder="Имя">
+
+<textarea id="studentWordsInput"
+placeholder="кот:cat
+дом:house"></textarea>
+
+<button onclick="addStudent()">Сохранить ученика</button>
+
+<hr>
+
+<h3>Ученики</h3>
+
+<div id="studentsEdit"></div>
+
+<hr>
+
+<h3>Результаты</h3>
+
+<div id="results"></div>
+
+</div>
+
 
 <script>
 
-const BIN="698f3a3043b1c97be97c510c"
+const BIN_ID="698f3a3043b1c97be97c510c ";
+const API_KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi";
 
-const KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi"
+const PASSWORD="tutorai";
 
-let DATA
-let CURRENT
-let WORDS=[]
+let data={};
+let currentStudent="";
+let words=[];
 
-async function load(){
 
-const res=await fetch(`https://api.jsonbin.io/v3/b/${BIN}/latest`,{
 
-headers:{
-"X-Master-Key":KEY
+async function loadData(){
+
+ let res=await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,{
+  headers:{
+   "X-Master-Key":API_KEY
+  }
+ });
+
+ let json=await res.json();
+
+ data=json.record;
+
+ if(!data.students) data.students={};
+ if(!data.results) data.results={};
+
+ showStudents();
+ showTutorStudents();
+ showResults();
+
 }
 
-})
 
-const json=await res.json()
-
-DATA=json.record
-
-showStudents()
-
-}
 
 function showStudents(){
 
-let html=""
+ let html="";
 
-for(let name in DATA.students){
+ for(let name in data.students){
 
-html+=`<button onclick="start('${name}')">${name}</button>`
+  html+=`<button onclick="startTest('${name}')">${name}</button>`;
 
-}
+ }
 
-document.getElementById("students").innerHTML=html
-
-}
-
-function start(name){
-
-CURRENT=name
-
-WORDS=DATA.students[name]
-
-document.getElementById("studentName").innerText=name
-
-document.getElementById("instruction").innerText=DATA.instruction
-
-let html=""
-
-WORDS.forEach((w,i)=>{
-
-html+=`${w.ru}<input id="w${i}"><br>`
-
-})
-
-document.getElementById("words").innerHTML=html
-
-document.getElementById("test").style.display="block"
+ document.getElementById("studentsList").innerHTML=html;
 
 }
 
-async function finish(){
 
-let correct=0
 
-let details=[]
+function startTest(name){
 
-WORDS.forEach((w,i)=>{
+ currentStudent=name;
 
-let val=document.getElementById("w"+i).value.trim()
+ words=data.students[name];
 
-let ok=val.toLowerCase()==w.en.toLowerCase()
+ document.getElementById("studentName").innerText=name;
 
-if(ok) correct++
+ document.getElementById("instruction").innerText=data.instruction;
 
-details.push({
-ru:w.ru,
-correct:w.en,
-answer:val,
-ok:ok
-})
+ let html="";
 
-})
+ words.forEach((w,i)=>{
 
-let percent=Math.round(correct/WORDS.length*100)
+  html+=`${w.ru}<input id="w${i}"><br>`;
 
-let grade=2
+ });
 
-if(percent>=90) grade=5
-else if(percent>=80) grade=4
-else if(percent>=70) grade=3
+ document.getElementById("words").innerHTML=html;
 
-let html=`<h2>${percent}% оценка ${grade}</h2>`
-
-details.forEach(d=>{
-
-if(d.ok)
-
-html+=`<p class="correct">${d.ru} ✔</p>`
-
-else
-
-html+=`<p class="wrong">${d.ru} ошибка → ${d.correct}</p>`
-
-})
-
-document.getElementById("result").innerHTML=html
-
-saveResult(percent,details)
+ document.getElementById("testPanel").classList.remove("hidden");
 
 }
 
-async function saveResult(percent,details){
 
-if(!DATA.results) DATA.results={}
 
-if(!DATA.results[CURRENT]) DATA.results[CURRENT]=[]
+async function finishTest(){
 
-DATA.results[CURRENT].push({
+ let correct=0;
+ let details=[];
 
-date:new Date().toLocaleString(),
+ words.forEach((w,i)=>{
 
-percent:percent,
+  let val=document.getElementById("w"+i).value.trim();
 
-details:details
+  let ok=val.toLowerCase()==w.en.toLowerCase();
 
-})
+  if(ok) correct++;
 
-await fetch(`https://api.jsonbin.io/v3/b/${BIN}`,{
+  details.push({
+   ru:w.ru,
+   correct:w.en,
+   answer:val,
+   ok:ok
+  });
 
-method:"PUT",
+ });
 
-headers:{
+ let percent=Math.round(correct/words.length*100);
 
-"Content-Type":"application/json",
+ if(!data.results[currentStudent])
+  data.results[currentStudent]=[];
 
-"X-Master-Key":KEY
+ data.results[currentStudent].push({
+  percent:percent,
+  date:new Date().toLocaleString()
+ });
 
-},
+ await saveData();
 
-body:JSON.stringify(DATA)
+ let html=`<h3>Результат: ${percent}%</h3>`;
 
-})
+ details.forEach(d=>{
+
+  if(d.ok)
+   html+=`<div class="correct">${d.ru} ✓</div>`;
+  else
+   html+=`<div class="wrong">${d.ru} ✗ (${d.correct})</div>`;
+
+ });
+
+ document.getElementById("result").innerHTML=html;
+
+ showResults();
 
 }
 
-load()
+
+
+function showTutorLogin(){
+
+ document.getElementById("tutorLogin").classList.remove("hidden");
+
+}
+
+
+
+function loginTutor(){
+
+ if(document.getElementById("tutorPass").value!=PASSWORD){
+
+  alert("Неверный пароль");
+  return;
+
+ }
+
+ document.getElementById("tutorPanel").classList.remove("hidden");
+
+ document.getElementById("instructionEdit").value=data.instruction;
+
+}
+
+
+
+async function saveInstruction(){
+
+ data.instruction=document.getElementById("instructionEdit").value;
+
+ await saveData();
+
+ alert("Сохранено");
+
+}
+
+
+
+async function addStudent(){
+
+ let name=document.getElementById("studentNameInput").value.trim();
+
+ let raw=document.getElementById("studentWordsInput").value.split("\n");
+
+ let arr=[];
+
+ raw.forEach(line=>{
+
+  let parts=line.split(":");
+
+  if(parts.length==2)
+   arr.push({
+    ru:parts[0].trim(),
+    en:parts[1].trim()
+   });
+
+ });
+
+ data.students[name]=arr;
+
+ await saveData();
+
+ showStudents();
+ showTutorStudents();
+
+ alert("Сохранено");
+
+}
+
+
+
+function showTutorStudents(){
+
+ let html="";
+
+ for(let name in data.students){
+
+  html+=`
+   ${name}
+   <button onclick="deleteStudent('${name}')">Удалить</button>
+   <br>
+  `;
+
+ }
+
+ document.getElementById("studentsEdit").innerHTML=html;
+
+}
+
+
+
+async function deleteStudent(name){
+
+ delete data.students[name];
+
+ await saveData();
+
+ showStudents();
+ showTutorStudents();
+
+}
+
+
+
+function showResults(){
+
+ let html="";
+
+ for(let name in data.results){
+
+  html+=`<b>${name}</b><br>`;
+
+  data.results[name].forEach(r=>{
+
+   html+=`${r.percent}% (${r.date})<br>`;
+
+  });
+
+  html+="<br>";
+
+ }
+
+ document.getElementById("results").innerHTML=html;
+
+}
+
+
+
+async function saveData(){
+
+ await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
+
+  method:"PUT",
+
+  headers:{
+   "Content-Type":"application/json",
+   "X-Master-Key":API_KEY
+  },
+
+  body:JSON.stringify(data)
+
+ });
+
+}
+
+
+
+loadData();
 
 </script>
 
