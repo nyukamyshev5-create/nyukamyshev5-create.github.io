@@ -3,95 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <title>Tutor</title>
-
-<script src="config.js"></script>
-
-<style>
-body{
-font-family:Arial;
-padding:30px;
-background:#f4f6f9;
-}
-
-.panel{
-background:white;
-padding:20px;
-border-radius:12px;
-max-width:900px;
-margin:auto;
-box-shadow:0 8px 25px rgba(0,0,0,0.1);
-}
-
-button{
-padding:6px 10px;
-margin:5px;
-border:none;
-border-radius:6px;
-cursor:pointer;
-background:#4e73df;
-color:white;
-}
-
-button:hover{
-background:#2e59d9;
-}
-
-textarea,input{
-width:100%;
-margin:5px 0;
-padding:6px;
-}
-
-.hidden{
-display:none;
-}
-
-.ok{
-color:green;
-font-weight:bold;
-}
-
-.err{
-color:red;
-font-weight:bold;
-}
-</style>
-
 </head>
 <body>
 
-<div id="login" class="panel">
+<div id="login">
 
 <h2>Вход</h2>
 
-<input type="password" id="pass" placeholder="Введите пароль">
+<input type="password" id="pass">
 
 <button onclick="login()">Войти</button>
 
 </div>
 
-
-<div id="panel" class="panel hidden">
+<div id="panel" style="display:none">
 
 <h2>Инструкция</h2>
 
-<textarea id="instruction" rows="3"></textarea>
+<textarea id="instruction"></textarea>
 
-<button onclick="saveInstruction()">Сохранить инструкцию</button>
+<button onclick="saveInstruction()">Сохранить</button>
 
 <hr>
 
 <h2>Добавить ученика</h2>
 
 Имя:
+
 <input id="name">
 
-Слова (формат: русский:english)
-<textarea id="words" rows="10"></textarea>
+Слова:
 
-<button onclick="add()">Добавить ученика</button>
+<textarea id="words"></textarea>
 
-<p id="msg"></p>
+<button onclick="addStudent()">Добавить</button>
 
 <hr>
 
@@ -101,55 +46,69 @@ font-weight:bold;
 
 </div>
 
-
-
 <script>
+
+const PASS="tutorai"
+
+const BIN="698f3a3043b1c97be97c510c"
+
+const KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi"
+
+let DATA
 
 function login(){
 
-const entered=document.getElementById("pass").value
-
-if(entered===CONFIG.adminPassword){
-
-document.getElementById("login").classList.add("hidden")
-
-document.getElementById("panel").classList.remove("hidden")
-
-load()
-
-}else{
+if(document.getElementById("pass").value!=PASS){
 
 alert("Неверный пароль")
 
-}
+return
 
 }
 
+document.getElementById("login").style.display="none"
 
+document.getElementById("panel").style.display="block"
+
+load()
+
+}
 
 async function load(){
 
-const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
+const res=await fetch(`https://api.jsonbin.io/v3/b/${BIN}/latest`,{
 
-const json=await res.json()
+headers:{
 
-const content=JSON.parse(atob(json.content))
-
-document.getElementById("instruction").value=content.instruction||""
-
-showStudents(content.students||{})
+"X-Master-Key":KEY
 
 }
 
+})
 
+DATA=(await res.json()).record
 
-function showStudents(students){
+document.getElementById("instruction").value=DATA.instruction
+
+showStudents()
+
+}
+
+function showStudents(){
 
 let html=""
 
-for(let name in students){
+for(let name in DATA.students){
 
-html+=`<p>${name} <button onclick="remove('${name}')">Удалить</button></p>`
+html+=`
+
+<h3>${name}</h3>
+
+<button onclick="deleteStudent('${name}')">Удалить</button>
+
+${showResults(name)}
+
+`
 
 }
 
@@ -157,139 +116,87 @@ document.getElementById("students").innerHTML=html
 
 }
 
+function showResults(name){
 
+if(!DATA.results) return ""
+
+if(!DATA.results[name]) return ""
+
+let html=""
+
+DATA.results[name].forEach((r,i)=>{
+
+html+=`Попытка ${i+1}: ${r.percent}%<br>`
+
+})
+
+return html
+
+}
 
 async function saveInstruction(){
 
-const data=await getData()
+DATA.instruction=document.getElementById("instruction").value
 
-data.instruction=document.getElementById("instruction").value
-
-await saveData(data)
-
-showMsg("Сохранено")
+save()
 
 }
 
+async function addStudent(){
 
+let name=document.getElementById("name").value
 
-async function add(){
+let raw=document.getElementById("words").value.split("\n")
 
-const name=document.getElementById("name").value.trim()
+DATA.students[name]=[]
 
-const raw=document.getElementById("words").value.trim()
+raw.forEach(line=>{
 
-if(!name||!raw){
+let parts=line.split(":")
 
-showMsg("Заполните всё",true)
-return
+DATA.students[name].push({
 
-}
+ru:parts[0],
 
-const lines=raw.split("\n")
-
-let words=[]
-
-lines.forEach(line=>{
-
-const parts=line.split(":")
-
-if(parts.length===2){
-
-words.push({
-
-ru:parts[0].trim(),
-
-en:parts[1].trim()
+en:parts[1]
 
 })
 
-}
-
 })
 
-const data=await getData()
-
-if(!data.students) data.students={}
-
-data.students[name]=words
-
-await saveData(data)
-
-showMsg("Ученик добавлен")
-
-load()
+save()
 
 }
 
+async function deleteStudent(name){
 
+delete DATA.students[name]
 
-async function remove(name){
+delete DATA.results[name]
 
-const data=await getData()
-
-delete data.students[name]
-
-await saveData(data)
-
-showMsg("Удалено")
-
-load()
+save()
 
 }
 
+async function save(){
 
-
-async function getData(){
-
-const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
-
-const json=await res.json()
-
-return JSON.parse(atob(json.content))
-
-}
-
-
-
-async function saveData(data){
-
-const res=await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`)
-
-const json=await res.json()
-
-await fetch(`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,{
+await fetch(`https://api.jsonbin.io/v3/b/${BIN}`,{
 
 method:"PUT",
 
 headers:{
-Authorization:`Bearer ${CONFIG.token}`,
-"Content-Type":"application/json"
+
+"Content-Type":"application/json",
+
+"X-Master-Key":KEY
+
 },
 
-body:JSON.stringify({
-
-message:"update",
-
-content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
-
-sha:json.sha
+body:JSON.stringify(DATA)
 
 })
 
-})
-
-}
-
-
-
-function showMsg(text,error){
-
-const el=document.getElementById("msg")
-
-el.innerText=text
-
-el.className=error?"err":"ok"
+load()
 
 }
 
