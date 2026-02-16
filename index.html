@@ -4,15 +4,13 @@
 <meta charset="UTF-8">
 <title>Диктанты</title>
 
-<script src="config.js"></script>
-
 <style>
 body{
 font-family:Arial;
 background:linear-gradient(135deg,#4e73df,#1cc88a);
+text-align:center;
 margin:0;
 padding:0;
-text-align:center;
 }
 
 .container{
@@ -27,9 +25,16 @@ box-shadow:0 10px 30px rgba(0,0,0,0.2);
 button{
 padding:10px;
 margin:5px;
+border:none;
+border-radius:8px;
+background:#4e73df;
+color:white;
+cursor:pointer;
 }
+
 .correct{color:green;}
 .wrong{color:red;}
+
 #test{display:none;}
 </style>
 </head>
@@ -38,18 +43,20 @@ margin:5px;
 <div class="container">
 
 <h2>Выберите ученика</h2>
-<div id="studentsList"></div>
+
+<div id="students"></div>
 
 <hr>
 
 <div id="test">
 
-<h3 id="studentTitle"></h3>
+<h3 id="studentName"></h3>
+
 <p id="instruction"></p>
 
 <div id="words"></div>
 
-<button onclick="send()">Отправить</button>
+<button onclick="finish()">Отправить</button>
 
 <div id="result"></div>
 
@@ -59,56 +66,59 @@ margin:5px;
 
 <script>
 
-let words=[]
-let currentStudent=""
-let sha=""
+const BIN="698f3a3043b1c97be97c510c"
 
-async function loadData(){
+const KEY="$2a$10$sw1K/RXpKK2k3L5l6.wDLuJWKESzfg51etzmCpCb/Q6sEKy0Oudwi"
 
-const res=await fetch(
-`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
-{
-headers:{Authorization:`Bearer ${CONFIG.token}`}
+let DATA
+let CURRENT
+let WORDS=[]
+
+async function load(){
+
+const res=await fetch(`https://api.jsonbin.io/v3/b/${BIN}/latest`,{
+
+headers:{
+"X-Master-Key":KEY
+}
+
 })
 
 const json=await res.json()
 
-sha=json.sha
+DATA=json.record
 
-return JSON.parse(atob(json.content))
+showStudents()
 
 }
 
-async function loadStudents(){
-
-const data=await loadData()
+function showStudents(){
 
 let html=""
 
-for(let name in data.students){
+for(let name in DATA.students){
 
-html+=`<button onclick="startTest('${name}')">${name}</button>`
-
-}
-
-document.getElementById("studentsList").innerHTML=html
+html+=`<button onclick="start('${name}')">${name}</button>`
 
 }
 
-async function startTest(name){
+document.getElementById("students").innerHTML=html
 
-currentStudent=name
+}
 
-const data=await loadData()
+function start(name){
 
-words=data.students[name]
+CURRENT=name
 
-document.getElementById("studentTitle").innerText=name
-document.getElementById("instruction").innerText=data.instruction
+WORDS=DATA.students[name]
+
+document.getElementById("studentName").innerText=name
+
+document.getElementById("instruction").innerText=DATA.instruction
 
 let html=""
 
-words.forEach((w,i)=>{
+WORDS.forEach((w,i)=>{
 
 html+=`${w.ru}<input id="w${i}"><br>`
 
@@ -120,18 +130,19 @@ document.getElementById("test").style.display="block"
 
 }
 
-async function send(){
+async function finish(){
 
 let correct=0
+
 let details=[]
 
-words.forEach((w,i)=>{
+WORDS.forEach((w,i)=>{
 
 let val=document.getElementById("w"+i).value.trim()
 
 let ok=val.toLowerCase()==w.en.toLowerCase()
 
-if(ok)correct++
+if(ok) correct++
 
 details.push({
 ru:w.ru,
@@ -142,15 +153,27 @@ ok:ok
 
 })
 
-let percent=Math.round(correct/words.length*100)
+let percent=Math.round(correct/WORDS.length*100)
 
 let grade=2
 
-if(percent>=90)grade=5
-else if(percent>=80)grade=4
-else if(percent>=70)grade=3
+if(percent>=90) grade=5
+else if(percent>=80) grade=4
+else if(percent>=70) grade=3
 
-let html=`<h2>${percent}%</h2><h2>Оценка ${grade}</h2>`
+let html=`<h2>${percent}% оценка ${grade}</h2>`
+
+details.forEach(d=>{
+
+if(d.ok)
+
+html+=`<p class="correct">${d.ru} ✔</p>`
+
+else
+
+html+=`<p class="wrong">${d.ru} ошибка → ${d.correct}</p>`
+
+})
 
 document.getElementById("result").innerHTML=html
 
@@ -160,30 +183,39 @@ saveResult(percent,details)
 
 async function saveResult(percent,details){
 
-let data=await loadData()
+if(!DATA.results) DATA.results={}
 
-if(!data.results)data.results={}
+if(!DATA.results[CURRENT]) DATA.results[CURRENT]=[]
 
-data.results[currentStudent]={percent,details}
+DATA.results[CURRENT].push({
 
-await fetch(
-`https://api.github.com/repos/${CONFIG.owner}/${CONFIG.repo}/contents/${CONFIG.file}`,
-{
-method:"PUT",
-headers:{
-Authorization:`Bearer ${CONFIG.token}`,
-"Content-Type":"application/json"
-},
-body:JSON.stringify({
-message:"update result",
-content:btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2)))),
-sha:sha
+date:new Date().toLocaleString(),
+
+percent:percent,
+
+details:details
+
 })
+
+await fetch(`https://api.jsonbin.io/v3/b/${BIN}`,{
+
+method:"PUT",
+
+headers:{
+
+"Content-Type":"application/json",
+
+"X-Master-Key":KEY
+
+},
+
+body:JSON.stringify(DATA)
+
 })
 
 }
 
-loadStudents()
+load()
 
 </script>
 
